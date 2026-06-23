@@ -1,0 +1,621 @@
+# 12-technical-decisions-and-conventions.md
+
+# Overview
+
+This document defines the technical decisions, coding standards, and implementation conventions for the project.
+
+Its purpose is to provide unambiguous guidance during development and ensure consistent implementation, especially when using AI-assisted development tools such as Claude Code and Claude Agent.
+
+This document acts as the implementation source of truth alongside the architecture documentation.
+
+---
+
+# Technology Stack
+
+## Backend
+
+* .NET 8
+* ASP.NET Core Web API
+* Entity Framework Core 8
+* ASP.NET Core Identity
+* PostgreSQL
+* KubernetesClient NuGet Package
+
+## Frontend
+
+* Next.js 15
+* React 19
+* TypeScript
+* Tailwind CSS
+* shadcn/ui
+* Lucide Icons
+* Native fetch API
+* React Hooks (`useEffect`, `useState`)
+
+## Infrastructure
+
+* Terraform >= 1.10
+* AWS Provider ~> 5.0
+* Amazon EKS
+* Amazon RDS PostgreSQL
+* Amazon S3
+* Amazon CloudFront
+
+---
+
+# Build Environment
+
+* Docker
+* node:20-slim
+* AWS CLI v2
+
+---
+
+# Backend Architecture Conventions
+
+## Architecture Pattern
+
+```text id="k0jng6"
+Controller
+     ↓
+Service
+     ↓
+EF Core DbContext
+```
+
+Repository pattern will not be used.
+
+Services communicate directly with Entity Framework Core.
+
+---
+
+# Controllers
+
+Controllers should remain thin.
+
+## Responsibilities
+
+* Request validation
+* Calling services
+* Returning responses
+
+Controllers should not contain business logic.
+
+---
+
+# Services
+
+Services contain all business logic.
+
+Examples:
+
+* ProjectService
+* DeploymentService
+* AuthService
+* ProfileService
+* DashboardService
+* AdminService
+* BuildService
+
+Services should use dependency injection through constructors.
+
+---
+
+# Dependency Injection
+
+All services must be registered using ASP.NET Core Dependency Injection.
+
+Example:
+
+```csharp id="hbjlwm"
+builder.Services.AddScoped<IProjectService, ProjectService>();
+```
+
+---
+
+# Async Conventions
+
+All database operations and I/O operations should use `async/await`.
+
+Avoid synchronous database calls.
+
+Examples:
+
+```csharp id="4z6hry"
+await _context.Projects.ToListAsync();
+await _userManager.FindByEmailAsync(email);
+```
+
+---
+
+# Authentication Conventions
+
+## Authentication Method
+
+Session-based authentication using ASP.NET Core Identity.
+
+## Session Storage
+
+Authentication is performed using secure cookies.
+
+Cookie configuration:
+
+```text id="yl3tq2"
+HttpOnly = true
+Secure = true (Production)
+SameSite = Lax
+```
+
+---
+
+# Password Hashing
+
+Password hashing is handled by ASP.NET Core Identity.
+
+Custom password hashing implementations should not be used.
+
+---
+
+# Authorization
+
+Authorization is role-based.
+
+Roles:
+
+* User
+* Admin
+
+---
+
+# Database Conventions
+
+## ORM
+
+Entity Framework Core 8.
+
+---
+
+## Naming
+
+### Entities
+
+* User
+* Project
+* Deployment
+* DeploymentLog
+
+### DbSets
+
+* Users
+* Projects
+* Deployments
+* DeploymentLogs
+
+---
+
+# Migrations
+
+All database schema changes must be performed using EF Core Migrations.
+
+Manual database modifications should be avoided.
+
+Applied migrations should never be modified.
+
+---
+
+# API Conventions
+
+## Request DTO Naming
+
+* CreateProjectRequest
+* UpdateProjectRequest
+* LoginRequest
+* RegisterRequest
+
+---
+
+## Response DTO Naming
+
+* ProjectResponse
+* DeploymentResponse
+* ProfileResponse
+* DashboardResponse
+
+---
+
+## Controller Naming
+
+* AuthController
+* ProjectsController
+* DeploymentsController
+* ProfileController
+* AdminController
+* DashboardController
+
+---
+
+# HTTP Status Codes
+
+* 200 OK
+* 201 Created
+* 400 Bad Request
+* 401 Unauthorized
+* 403 Forbidden
+* 404 Not Found
+* 500 Internal Server Error
+
+---
+
+# API Response Shape
+
+## Success
+
+```json id="xpr9z8"
+{
+  "message": "Success",
+  "data": {}
+}
+```
+
+## Error
+
+```json id="njx5yv"
+{
+  "message": "Validation failed",
+  "errors": []
+}
+```
+
+---
+
+# Validation Errors
+
+Validation errors should return:
+
+```json id="4zv0g4"
+{
+  "message": "Validation failed",
+  "errors": [
+    "Project name is required",
+    "Repository URL is invalid"
+  ]
+}
+```
+
+---
+
+# Error Handling
+
+A global exception middleware must be used.
+
+Middleware:
+
+```text id="i5qcc1"
+GlobalExceptionMiddleware
+```
+
+## Custom Exceptions
+
+* NotFoundException
+* ValidationException
+* ForbiddenException
+
+All exceptions should be translated into standardized API responses.
+
+---
+
+# Frontend Conventions
+
+## HTTP Client
+
+The frontend uses the native `fetch` API.
+
+A dedicated API layer should be created:
+
+```text id="h6r7jq"
+src/services/api.ts
+```
+
+---
+
+# API Structure
+
+Examples:
+
+```text id="pqvjlwm"
+api.projects.list()
+api.projects.get(id)
+api.projects.create()
+api.deployments.get(id)
+```
+
+---
+
+# Fetch Configuration
+
+All authenticated requests must use:
+
+```ts id="66clj2"
+credentials: 'include'
+```
+
+---
+
+# Error Handling
+
+Non-2xx responses should throw errors.
+
+### 401
+
+Redirect to Login Page.
+
+### 403
+
+Show Access Denied Message.
+
+### 500
+
+Show Generic Error Message.
+
+---
+
+# Data Fetching
+
+Use:
+
+* useEffect
+* useState
+
+React Query will not be used in the MVP.
+
+---
+
+# Component Structure
+
+One component per file.
+
+Examples:
+
+* ProjectCard.tsx
+* ProjectList.tsx
+* DeploymentTable.tsx
+
+---
+
+# Exports
+
+Prefer named exports.
+
+Avoid default exports unless necessary.
+
+---
+
+# Protected Routes
+
+Authentication state should be handled through:
+
+```text id="53wl39"
+AuthProvider
+```
+
+Protected pages should verify authentication before rendering.
+
+---
+
+# UI Conventions
+
+## Styling
+
+* Tailwind CSS
+* shadcn/ui
+
+## Icons
+
+* Lucide Icons
+
+## Design Goals
+
+* Clean SaaS interface
+* Responsive design
+* Modern dashboard layout
+* Consistent spacing and typography
+
+---
+
+# Environment Variables
+
+## Backend
+
+Examples:
+
+```text id="4qj0v3"
+ConnectionStrings__DefaultConnection
+Authentication__CookieName
+AWS__Region
+AWS__BucketName
+AWS__CloudFrontDistributionId
+```
+
+## Frontend
+
+Examples:
+
+```text id="gc4f9d"
+NEXT_PUBLIC_API_URL
+```
+
+---
+
+# Kubernetes Conventions
+
+## Kubernetes Client
+
+NuGet Package:
+
+```text id="hvjlwm"
+KubernetesClient
+```
+
+## In-Cluster Configuration
+
+```csharp id="lp4dwq"
+KubernetesClientConfiguration.InClusterConfig()
+```
+
+---
+
+# Build Jobs
+
+Every deployment creates a new Kubernetes Job.
+
+Responsibilities:
+
+1. Clone repository
+2. Install dependencies
+3. Build application
+4. Upload artifacts to S3
+
+---
+
+# Build Image
+
+```text id="y3j1qu"
+node:20-slim
+```
+
+---
+
+# Terraform Conventions
+
+## Resource Naming
+
+Pattern:
+
+```text id="j9jod6"
+hosting-platform-{environment}-{resource}
+```
+
+Examples:
+
+```text id="f4mjlwm"
+hosting-platform-dev-eks
+hosting-platform-dev-rds
+hosting-platform-prod-s3
+```
+
+---
+
+# Resource Tags
+
+Every resource must contain:
+
+```text id="jkpbnh"
+Project = hosting-platform
+Environment = dev | prod
+ManagedBy = Terraform
+```
+
+---
+
+# Development Environment Values
+
+These are initial development values.
+
+Terraform `tfvars` files take precedence.
+
+---
+
+## VPC
+
+```text id="up1gqm"
+10.0.0.0/16
+```
+
+## Public Subnets
+
+```text id="dz6xk0"
+10.0.1.0/24
+10.0.2.0/24
+```
+
+## Private Subnets
+
+```text id="f18tgs"
+10.0.3.0/24
+10.0.4.0/24
+```
+
+## EKS
+
+```text id="9rwrrw"
+Managed Node Group
+Min Nodes: 1
+Max Nodes: 3
+Desired Nodes: 1
+```
+
+## Database
+
+```text id="8mjlwm"
+Engine: PostgreSQL
+Instance: db.t3.micro
+```
+
+---
+
+# Logging Conventions
+
+## Application Logs
+
+```text id="e1ecg7"
+ILogger<T>
+```
+
+## Deployment Logs
+
+```text id="0yprvq"
+DeploymentLog database table
+```
+
+## Build Logs
+
+Stored in DeploymentLog records.
+
+CloudWatch integration can be added later.
+
+---
+
+# Solution Structure
+
+```text id="7wz0f8"
+backend/
+frontend/
+terraform/
+k8s/
+docs/
+```
+
+---
+
+# Coding Principles
+
+* Keep controllers thin.
+* Keep services focused.
+* Prefer simplicity over abstraction.
+* Avoid unnecessary patterns.
+* Avoid premature optimization.
+* Keep the MVP achievable within one month.
+* Prefer readability and maintainability.
+* Always consider AWS cost optimization.
+
+---
+
+# AI Development Guidelines
+
+When implementing new features:
+
+1. Follow this document before introducing new patterns.
+2. Do not introduce additional libraries unless necessary.
+3. Maintain consistency with existing naming conventions.
+4. Prefer simple solutions over complex abstractions.
+5. Keep the architecture aligned with the master specification.
