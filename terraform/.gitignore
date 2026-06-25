@@ -1,0 +1,16 @@
+# Provider cache and plugin directories
+**/.terraform/*
+
+# Lock file is intentionally committed for reproducibility
+!**/.terraform.lock.hcl
+
+# State files — never commit
+*.tfstate
+*.tfstate.backup
+
+# Plan output files
+*.tfplan
+
+# Crash logs
+crash.log
+crash.*.log
