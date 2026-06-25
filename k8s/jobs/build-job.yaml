@@ -1,0 +1,44 @@
+# This manifest is a reference template. The backend (BuildService) creates Job
+# objects programmatically via the Kubernetes API, using this spec as a guide.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-job # overridden per deployment: build-<deployment-id>
+  namespace: hosting-platform
+  labels:
+    app: build-job
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: build-job
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: build
+          image: node:20-slim
+          env:
+            - name: DEPLOYMENT_ID
+              value: "" # set dynamically by BuildService
+            - name: PROJECT_ID
+              value: "" # set dynamically by BuildService
+            - name: REPOSITORY_URL
+              value: "" # set dynamically by BuildService
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: s3_bucket
+            - name: CLOUDFRONT_DISTRIBUTION_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: cloudfront_distribution_id
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
