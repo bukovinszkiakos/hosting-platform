@@ -60,11 +60,12 @@ Next.js application.
 ```text id="w5c4sr"
 frontend/
 ├── src/
-├── app/
-├── components/
-├── services/
-├── types/
-├── hooks/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   ├── services/
+│   ├── types/
+│   └── hooks/
 └── public/
 ```
 
