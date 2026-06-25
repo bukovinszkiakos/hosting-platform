@@ -94,14 +94,17 @@ ASP.NET Core Web API.
 
 ```text id="pl3g1h"
 backend/
-├── Controllers/
-├── Services/
-├── Entities/
-├── DTOs/
-├── Middleware/
-├── Configuration/
-├── Extensions/
-└── Data/
+├── HostingPlatform.sln
+└── src/
+    └── HostingPlatform.Api/
+        ├── Controllers/
+        ├── Services/
+        ├── Entities/
+        ├── DTOs/
+        ├── Middleware/
+        ├── Configuration/
+        ├── Extensions/
+        └── Data/
 ```
 
 > Note: The Repository pattern will not be used. Services communicate directly with Entity Framework Core through `AppDbContext`.
