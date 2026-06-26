@@ -103,6 +103,7 @@ backend/
         ├── Entities/
         ├── DTOs/
         ├── Middleware/
+        ├── Exceptions/
         ├── Configuration/
         ├── Extensions/
         └── Data/

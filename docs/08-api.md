@@ -363,11 +363,25 @@ GET /api/admin/deployments
 
 # Error Responses
 
+All error responses use the standardized shape defined in
+`12-technical-decisions-and-conventions.md`:
+
+```json
+{
+  "message": "...",
+  "errors": []
+}
+```
+
 # Validation Error
 
 ```json
 {
-  "message": "Validation failed"
+  "message": "Validation failed",
+  "errors": [
+    "Project name is required",
+    "Repository URL is invalid"
+  ]
 }
 ```
 
@@ -377,7 +391,8 @@ GET /api/admin/deployments
 
 ```json
 {
-  "message": "Unauthorized"
+  "message": "Unauthorized",
+  "errors": []
 }
 ```
 
@@ -387,7 +402,8 @@ GET /api/admin/deployments
 
 ```json
 {
-  "message": "Forbidden"
+  "message": "Forbidden",
+  "errors": []
 }
 ```
 
@@ -397,7 +413,8 @@ GET /api/admin/deployments
 
 ```json
 {
-  "message": "Resource not found"
+  "message": "Resource not found",
+  "errors": []
 }
 ```
 
@@ -408,7 +425,9 @@ GET /api/admin/deployments
 ```json
 {
   "message": "Build failed",
-  "error": "package.json not found"
+  "errors": [
+    "package.json not found"
+  ]
 }
 ```
 

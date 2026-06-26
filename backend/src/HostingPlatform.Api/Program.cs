@@ -1,6 +1,7 @@
 using HostingPlatform.Api.Configuration;
 using HostingPlatform.Api.Data;
 using HostingPlatform.Api.Entities;
+using HostingPlatform.Api.Middleware;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,13 +41,13 @@ builder.Services.ConfigureApplicationCookie(options =>
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         context.Response.ContentType = "application/json";
-        return context.Response.WriteAsync("{\"message\":\"Unauthorized\"}");
+        return context.Response.WriteAsync("{\"message\":\"Unauthorized\",\"errors\":[]}");
     };
     options.Events.OnRedirectToAccessDenied = context =>
     {
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         context.Response.ContentType = "application/json";
-        return context.Response.WriteAsync("{\"message\":\"Forbidden\"}");
+        return context.Response.WriteAsync("{\"message\":\"Forbidden\",\"errors\":[]}");
     };
 });
 
@@ -57,6 +58,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
