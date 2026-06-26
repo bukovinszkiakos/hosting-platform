@@ -20,6 +20,8 @@ User
  └── Projects
       │
       └── Deployments
+           │
+           └── DeploymentLogs
 ```
 
 ## Relationships
@@ -27,6 +29,8 @@ User
 * A User can own multiple Projects.
 * A Project can have multiple Deployments.
 * A Deployment always belongs to a single Project.
+* A Deployment can have multiple DeploymentLogs.
+* A DeploymentLog always belongs to a single Deployment.
 
 ---
 
@@ -42,8 +46,9 @@ Stores platform users.
 | Email        | VARCHAR   | User email address |
 | PasswordHash | VARCHAR   | Encrypted password |
 | DisplayName  | VARCHAR   | Display name       |
-| Role         | VARCHAR   | User or Admin      |
 | CreatedAt    | TIMESTAMP | Creation timestamp |
+
+> Roles (User / Admin) are not stored as a column on the Users table. They are managed by ASP.NET Core Identity in the `AspNetRoles` and `AspNetUserRoles` tables.
 
 ## Example
 
@@ -51,7 +56,6 @@ Stores platform users.
 Id: 1
 Email: john@example.com
 DisplayName: John
-Role: User
 ```
 
 ---
@@ -148,6 +152,23 @@ Build failed
 ErrorMessage:
 package.json not found
 ```
+
+---
+
+# DeploymentLogs Table
+
+Stores simple log messages produced during a deployment.
+
+> Note: This schema is provisional. It is inferred from the current implementation (the `DeploymentLog` entity) and related documentation (doc 12), not from the original database specification. It may still change before the initial migration if the documentation evolves.
+
+## Fields
+
+| Field        | Type      | Description          |
+| ------------ | --------- | -------------------- |
+| Id           | UUID      | Unique identifier    |
+| DeploymentId | UUID      | Related deployment   |
+| Message      | TEXT      | Log message          |
+| CreatedAt    | TIMESTAMP | Record creation time |
 
 ---
 

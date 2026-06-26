@@ -166,6 +166,12 @@ jobs/
 
 * Application starts successfully.
 
+### Implementation Note
+
+**Cookie Authentication deliverable:** Satisfied by `AddIdentity<User, IdentityRole<Guid>>()` (which implicitly registers the cookie authentication scheme) and `UseAuthentication()` in the middleware pipeline.
+
+**Decision:** Cookie options (`HttpOnly`, `Secure`, `SameSite`, cookie name from configuration, 401/403 redirect suppression) are deferred to Task 14. Both tasks listed "Cookie authentication" as a deliverable; the split was agreed on the basis that `ConfigureApplicationCookie()` is part of ASP.NET Core Identity's configuration surface, which is Task 14's explicit scope. Task 9's acceptance criterion (application starts) is fully satisfied without the cookie options.
+
 ---
 
 ## Task 10 - Configure Exception Handling
@@ -236,6 +242,10 @@ jobs/
 ### Acceptance Criteria
 
 * Application starts successfully.
+
+### Implementation Note
+
+**Cookie authentication deliverable:** Configure cookie options via `ConfigureApplicationCookie()`: `HttpOnly = true`, `Secure = true` (production), `SameSite = Lax`, cookie name from `AuthenticationSettings`, and redirect suppression (return 401/403 instead of redirecting to a login page) for the JSON API. This was deferred from Task 9. See Task 9 Implementation Note for the full rationale.
 
 ---
 

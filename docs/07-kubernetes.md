@@ -171,7 +171,7 @@ The Job:
 The default image used by the Job:
 
 ```text
-node:20
+node:20-slim
 ```
 
 ---
