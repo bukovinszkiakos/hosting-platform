@@ -51,6 +51,13 @@ This document acts as the implementation source of truth alongside the architect
 
 ---
 
+# Local Development
+
+* Local development targets PostgreSQL 16 (matching the production RDS major version).
+* See `scripts/local-dev/README.md` for setup instructions.
+
+---
+
 # Backend Architecture Conventions
 
 ## Architecture Pattern

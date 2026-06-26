@@ -1,0 +1,23 @@
+# Local development PostgreSQL for the Hosting Platform backend.
+# Usage: docker compose -f scripts/local-dev/docker-compose.yml up -d
+# LOCAL DEVELOPMENT ONLY — production uses Amazon RDS (see docs/05-aws-architecture.md).
+services:
+  postgres:
+    image: postgres:16
+    container_name: hosting-platform-postgres
+    environment:
+      POSTGRES_DB: hostingplatform
+      POSTGRES_USER: hostingplatform
+      POSTGRES_PASSWORD: localdev
+    ports:
+      - "5432:5432"
+    volumes:
+      - hosting-platform-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hostingplatform -d hostingplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  hosting-platform-pgdata:
