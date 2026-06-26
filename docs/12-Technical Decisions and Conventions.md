@@ -306,8 +306,17 @@ GlobalExceptionMiddleware
 * NotFoundException
 * ValidationException
 * ForbiddenException
+* UnauthorizedException
 
 All exceptions should be translated into standardized API responses.
+
+Status code mapping:
+
+* ValidationException → 400 Bad Request
+* UnauthorizedException → 401 Unauthorized
+* ForbiddenException → 403 Forbidden
+* NotFoundException → 404 Not Found
+* Unhandled exceptions → 500 Internal Server Error
 
 ---
 

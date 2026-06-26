@@ -2,6 +2,7 @@ using HostingPlatform.Api.Configuration;
 using HostingPlatform.Api.Data;
 using HostingPlatform.Api.Entities;
 using HostingPlatform.Api.Middleware;
+using HostingPlatform.Api.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,6 +53,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

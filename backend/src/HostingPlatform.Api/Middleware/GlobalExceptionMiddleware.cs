@@ -26,13 +26,17 @@ public class GlobalExceptionMiddleware
         {
             await WriteResponse(context, StatusCodes.Status400BadRequest, ex.Message, ex.Errors);
         }
-        catch (NotFoundException ex)
+        catch (UnauthorizedException ex)
         {
-            await WriteResponse(context, StatusCodes.Status404NotFound, ex.Message);
+            await WriteResponse(context, StatusCodes.Status401Unauthorized, ex.Message);
         }
         catch (ForbiddenException ex)
         {
             await WriteResponse(context, StatusCodes.Status403Forbidden, ex.Message);
+        }
+        catch (NotFoundException ex)
+        {
+            await WriteResponse(context, StatusCodes.Status404NotFound, ex.Message);
         }
         catch (Exception ex)
         {
