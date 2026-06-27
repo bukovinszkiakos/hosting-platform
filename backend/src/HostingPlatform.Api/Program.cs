@@ -58,6 +58,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IDeploymentService, DeploymentService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
