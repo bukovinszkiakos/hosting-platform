@@ -144,10 +144,16 @@ GET /api/profile
 {
   "displayName": "John Doe",
   "email": "john@example.com",
+  "role": "User",
+  "createdAt": "2026-06-17T12:00:00Z",
   "projectsCount": 5,
   "deploymentsCount": 18
 }
 ```
+
+`role` and `createdAt` are included so the Profile page (see
+`09-frontend-pages.md`) can display all required user information from a
+single endpoint.
 
 ---
 
@@ -165,6 +171,14 @@ PUT /api/profile
 {
   "displayName": "John Doe",
   "email": "john@example.com"
+}
+```
+
+## Response
+
+```json
+{
+  "message": "Profile updated"
 }
 ```
 
