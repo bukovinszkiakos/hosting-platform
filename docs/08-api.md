@@ -316,6 +316,29 @@ GET /api/deployments/{id}
 
 ---
 
+# Get Deployment Logs
+
+Returns the stored log messages for a deployment.
+
+## Endpoint
+
+```http
+GET /api/deployments/{id}/logs
+```
+
+## Response
+
+```json
+[
+  {
+    "message": "Build Started",
+    "createdAt": "2026-06-17T12:00:00Z"
+  }
+]
+```
+
+---
+
 # Dashboard API
 
 # Get Dashboard
