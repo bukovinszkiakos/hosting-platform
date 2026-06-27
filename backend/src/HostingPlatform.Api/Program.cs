@@ -1,6 +1,7 @@
 using HostingPlatform.Api.Configuration;
 using HostingPlatform.Api.Data;
 using HostingPlatform.Api.Entities;
+using HostingPlatform.Api.Extensions;
 using HostingPlatform.Api.Middleware;
 using HostingPlatform.Api.Services;
 using Microsoft.AspNetCore.Identity;
@@ -61,6 +62,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+await app.SeedRolesAsync();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
