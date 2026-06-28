@@ -55,6 +55,13 @@ export interface CreateDeploymentResult {
   status: string;
 }
 
+export interface DashboardSummary {
+  projectsCount: number;
+  deploymentsCount: number;
+  onlineProjects: number;
+  failedProjects: number;
+}
+
 export interface MessageResponse {
   message: string;
 }
@@ -191,5 +198,8 @@ export const api = {
       apiFetch<Deployment>(`/api/deployments/${id}`, { signal }),
     logs: (id: string, signal?: AbortSignal) =>
       apiFetch<DeploymentLog[]>(`/api/deployments/${id}/logs`, { signal }),
+  },
+  dashboard: {
+    get: (signal?: AbortSignal) => apiFetch<DashboardSummary>("/api/dashboard", { signal }),
   },
 };
