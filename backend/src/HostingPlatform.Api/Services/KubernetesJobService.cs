@@ -36,4 +36,44 @@ public class KubernetesJobService : IKubernetesJobService
 
         return created;
     }
+
+    public async Task<BuildJobState> GetBuildJobStateAsync(
+        Guid deploymentId, CancellationToken cancellationToken = default)
+    {
+        var job = await _kubernetes.BatchV1.ReadNamespacedJobAsync(
+            BuildJobNaming.JobName(deploymentId), BuildJobNaming.Namespace,
+            cancellationToken: cancellationToken);
+
+        return MapState(job.Status);
+    }
+
+    // Maps a Kubernetes V1JobStatus to a BuildJobState. Terminal states are taken
+    // from the Job conditions (the authoritative completion signal); otherwise the
+    // active pod count distinguishes a running build from one not started yet.
+    private static BuildJobState MapState(V1JobStatus? status)
+    {
+        if (status is null)
+        {
+            return BuildJobState.Pending;
+        }
+
+        if (HasTrueCondition(status, "Failed"))
+        {
+            return BuildJobState.Failed;
+        }
+
+        if (HasTrueCondition(status, "Complete"))
+        {
+            return BuildJobState.Succeeded;
+        }
+
+        return status.Active.GetValueOrDefault() > 0
+            ? BuildJobState.Running
+            : BuildJobState.Pending;
+    }
+
+    private static bool HasTrueCondition(V1JobStatus status, string type) =>
+        status.Conditions?.Any(c =>
+            string.Equals(c.Type, type, StringComparison.Ordinal) &&
+            string.Equals(c.Status, "True", StringComparison.Ordinal)) ?? false;
 }

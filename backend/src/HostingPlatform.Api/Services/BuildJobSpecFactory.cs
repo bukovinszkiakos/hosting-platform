@@ -10,16 +10,12 @@ namespace HostingPlatform.Api.Services;
 // (KubernetesJobService).
 public class BuildJobSpecFactory : IBuildJobSpecFactory
 {
-    // All platform components run in a single namespace (docs/07-kubernetes.md).
-    private const string Namespace = "hosting-platform";
-
     // Default build image (docs/07-kubernetes.md "Build Image"). The image is also
     // expected to provide git and the AWS CLI v2 (docs/12 "Build Environment"),
     // which the build script below relies on.
     private const string BuildImage = "node:20-slim";
 
     private const string ContainerName = "build";
-    private const string JobNamePrefix = "build-";
 
     // Build Job resources (docs/07-kubernetes.md "Build Job Resources").
     private const string CpuRequest = "1000m";
@@ -43,7 +39,7 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
 
     public V1Job Create(BuildJobParameters parameters)
     {
-        var jobName = JobNamePrefix + parameters.DeploymentId;
+        var jobName = BuildJobNaming.JobName(parameters.DeploymentId);
 
         // Labels let later tasks (monitoring, log collection) find the Job and its pods.
         var labels = new Dictionary<string, string>
@@ -81,7 +77,7 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
             Metadata = new V1ObjectMeta
             {
                 Name = jobName,
-                NamespaceProperty = Namespace,
+                NamespaceProperty = BuildJobNaming.Namespace,
                 Labels = labels,
             },
             Spec = new V1JobSpec
