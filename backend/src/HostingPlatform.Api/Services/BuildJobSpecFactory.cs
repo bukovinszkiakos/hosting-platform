@@ -45,7 +45,7 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
         var labels = new Dictionary<string, string>
         {
             ["app"] = "hosting-platform-build",
-            ["deployment-id"] = parameters.DeploymentId.ToString(),
+            [BuildJobNaming.DeploymentIdLabel] = parameters.DeploymentId.ToString(),
         };
 
         var container = new V1Container

@@ -9,10 +9,12 @@ namespace HostingPlatform.Api.Services;
 public class DeploymentService : IDeploymentService
 {
     private readonly AppDbContext _context;
+    private readonly IKubernetesJobService _kubernetesJobService;
 
-    public DeploymentService(AppDbContext context)
+    public DeploymentService(AppDbContext context, IKubernetesJobService kubernetesJobService)
     {
         _context = context;
+        _kubernetesJobService = kubernetesJobService;
     }
 
     public async Task<DeploymentResponse> CreateDeploymentAsync(Guid userId, Guid projectId)
@@ -119,6 +121,25 @@ public class DeploymentService : IDeploymentService
         await _context.SaveChangesAsync();
 
         return ToResponse(deployment);
+    }
+
+    public async Task CollectBuildLogsAsync(Guid deploymentId, CancellationToken cancellationToken = default)
+    {
+        var logs = await _kubernetesJobService.GetBuildJobLogsAsync(deploymentId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(logs))
+        {
+            return;
+        }
+
+        _context.DeploymentLogs.Add(new DeploymentLog
+        {
+            Id = Guid.NewGuid(),
+            DeploymentId = deploymentId,
+            Message = logs,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     // Loads a deployment the user owns (via its project), or throws NotFound.

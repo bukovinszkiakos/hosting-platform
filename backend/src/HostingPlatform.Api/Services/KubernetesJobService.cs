@@ -76,4 +76,24 @@ public class KubernetesJobService : IKubernetesJobService
         status.Conditions?.Any(c =>
             string.Equals(c.Type, type, StringComparison.Ordinal) &&
             string.Equals(c.Status, "True", StringComparison.Ordinal)) ?? false;
+
+    public async Task<string> GetBuildJobLogsAsync(
+        Guid deploymentId, CancellationToken cancellationToken = default)
+    {
+        var pods = await _kubernetes.CoreV1.ListNamespacedPodAsync(
+            BuildJobNaming.Namespace,
+            labelSelector: BuildJobNaming.DeploymentLabelSelector(deploymentId),
+            cancellationToken: cancellationToken);
+
+        var pod = pods.Items.FirstOrDefault();
+        if (pod is null)
+        {
+            return string.Empty;
+        }
+
+        await using var stream = await _kubernetes.CoreV1.ReadNamespacedPodLogAsync(
+            pod.Metadata.Name, BuildJobNaming.Namespace, cancellationToken: cancellationToken);
+        using var reader = new StreamReader(stream);
+        return await reader.ReadToEndAsync(cancellationToken);
+    }
 }

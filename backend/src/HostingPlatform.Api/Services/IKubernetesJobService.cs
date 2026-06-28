@@ -9,4 +9,8 @@ public interface IKubernetesJobService
 
     // Retrieves the current state of the build Job for the given deployment.
     Task<BuildJobState> GetBuildJobStateAsync(Guid deploymentId, CancellationToken cancellationToken = default);
+
+    // Reads the build pod's logs for the given deployment. Returns an empty string
+    // if no build pod exists (yet).
+    Task<string> GetBuildJobLogsAsync(Guid deploymentId, CancellationToken cancellationToken = default);
 }
