@@ -63,6 +63,7 @@ builder.Services.AddScoped<IDeploymentService, DeploymentService>();
 // Stateless build Job specification generator (Task 25); consumed by the
 // Kubernetes Job creation service in Task 26.
 builder.Services.AddSingleton<IBuildJobSpecFactory, BuildJobSpecFactory>();
+builder.Services.AddScoped<IKubernetesJobService, KubernetesJobService>();
 
 builder.Services.AddKubernetesClient();
 
