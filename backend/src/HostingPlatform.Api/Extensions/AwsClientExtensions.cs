@@ -1,4 +1,5 @@
 using Amazon;
+using Amazon.CloudFront;
 using Amazon.S3;
 using HostingPlatform.Api.Configuration;
 using Microsoft.Extensions.Options;
@@ -23,6 +24,26 @@ public static class AwsClientExtensions
             }
 
             return new AmazonS3Client(config);
+        });
+
+        return services;
+    }
+
+    // Registers the CloudFront client. Like the S3 client, credentials come from the
+    // default AWS credential provider chain and it is resolved lazily as a singleton.
+    // CloudFront is a global service; the region only affects request signing.
+    public static IServiceCollection AddCloudFrontClient(this IServiceCollection services)
+    {
+        services.AddSingleton<IAmazonCloudFront>(sp =>
+        {
+            var aws = sp.GetRequiredService<IOptions<AwsSettings>>().Value;
+            var config = new AmazonCloudFrontConfig();
+            if (!string.IsNullOrWhiteSpace(aws.Region))
+            {
+                config.RegionEndpoint = RegionEndpoint.GetBySystemName(aws.Region);
+            }
+
+            return new AmazonCloudFrontClient(config);
         });
 
         return services;

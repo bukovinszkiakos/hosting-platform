@@ -70,6 +70,9 @@ builder.Services.AddKubernetesClient();
 builder.Services.AddS3Client();
 builder.Services.AddScoped<IS3Service, S3Service>();
 
+builder.Services.AddCloudFrontClient();
+builder.Services.AddScoped<ICloudFrontService, CloudFrontService>();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
