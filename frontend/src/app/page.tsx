@@ -1,102 +1,151 @@
-import Image from "next/image";
+import type { ComponentType } from "react";
 
-export default function Home() {
+import Link from "next/link";
+import {
+  Activity,
+  ArrowRight,
+  Cloud,
+  GitBranch,
+  Hammer,
+  Rocket,
+  Server,
+} from "lucide-react";
+
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+type Feature = {
+  title: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+// See docs/09-frontend-pages.md "Features Section".
+const features: Feature[] = [
+  {
+    title: "GitHub Integration",
+    description: "Publish straight from a public GitHub repository.",
+    icon: GitBranch,
+  },
+  {
+    title: "Automatic Build Process",
+    description: "Frameworks are detected and built for you.",
+    icon: Hammer,
+  },
+  {
+    title: "Cloud Hosting",
+    description: "Static files are stored and served from the cloud.",
+    icon: Cloud,
+  },
+  {
+    title: "Deployment Tracking",
+    description: "Follow every deployment's status and logs.",
+    icon: Activity,
+  },
+  {
+    title: "AWS Powered Infrastructure",
+    description: "Runs on S3 and CloudFront behind the scenes.",
+    icon: Server,
+  },
+];
+
+// See docs/09-frontend-pages.md "How It Works Section".
+const steps = [
+  { title: "Add Repository", description: "Point us at your public GitHub repository." },
+  { title: "Deploy", description: "Start a deployment with a single click." },
+  { title: "Get Public URL", description: "Your site goes live on a public URL." },
+];
+
+export default function LandingPage() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="border-b border-border">
+        <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <Rocket className="size-5 text-primary" />
+            <span className="text-base font-semibold">Hosting Platform</span>
+          </div>
+          <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }))}>
+            Login
+          </Link>
         </div>
+      </header>
+
+      <main className="flex-1">
+        {/* Hero */}
+        <section className="mx-auto w-full max-w-5xl px-4 py-20 text-center sm:py-28">
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+            Deploy Your Website In Minutes
+          </h1>
+          <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
+            Publish your static website directly from GitHub without managing AWS
+            infrastructure.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/register"
+              className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
+            >
+              Get Started
+              <ArrowRight />
+            </Link>
+            <Link
+              href="/login"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "w-full sm:w-auto",
+              )}
+            >
+              Login
+            </Link>
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section className="border-t border-border bg-muted/30">
+          <div className="mx-auto w-full max-w-5xl px-4 py-16">
+            <h2 className="text-center text-2xl font-semibold">How It Works</h2>
+            <div className="mt-10 grid gap-8 sm:grid-cols-3">
+              {steps.map((step, index) => (
+                <div key={step.title} className="flex flex-col items-center text-center">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                    {index + 1}
+                  </div>
+                  <h3 className="mt-4 font-medium">{step.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{step.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className="mx-auto w-full max-w-5xl px-4 py-16">
+          <h2 className="text-center text-2xl font-semibold">Everything you need to ship</h2>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <div
+                  key={feature.title}
+                  className="rounded-xl border border-border bg-card p-5"
+                >
+                  <Icon className="size-6 text-primary" />
+                  <h3 className="mt-4 font-medium">{feature.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {feature.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto w-full max-w-5xl px-4 py-6 text-center text-sm text-muted-foreground">
+          Hosting Platform
+        </div>
       </footer>
     </div>
   );
