@@ -90,6 +90,17 @@ variable "allocated_storage" {
   }
 }
 
+variable "backup_retention_period" {
+  type        = number
+  description = "Days to retain automated backups. 1 keeps dev costs low; production should retain several days. 0 disables automated backups."
+  default     = 1
+
+  validation {
+    condition     = var.backup_retention_period >= 0 && var.backup_retention_period <= 35
+    error_message = "backup_retention_period must be between 0 and 35 days."
+  }
+}
+
 variable "multi_az" {
   type        = bool
   description = "Whether to run the database as Multi-AZ. Disabled by default to keep dev costs low."

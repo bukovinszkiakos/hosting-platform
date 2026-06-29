@@ -56,9 +56,10 @@ resource "aws_db_instance" "this" {
   db_subnet_group_name   = aws_db_subnet_group.this.name
   vpc_security_group_ids = [aws_security_group.this.id]
 
-  multi_az            = var.multi_az
-  publicly_accessible = false
-  skip_final_snapshot = var.skip_final_snapshot
+  backup_retention_period = var.backup_retention_period
+  multi_az                = var.multi_az
+  publicly_accessible     = false
+  skip_final_snapshot     = var.skip_final_snapshot
 
   tags = {
     Name = "${var.name_prefix}-postgres"

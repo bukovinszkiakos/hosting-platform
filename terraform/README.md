@@ -29,7 +29,7 @@ Both environments compose the same modules; they differ only in variables:
 | VPC CIDR             | `10.0.0.0/16`        | `10.1.0.0/16`         |
 | Availability Zones   | 2                    | 3                     |
 | EKS nodes            | 1–3 × `t3.medium`    | 2–5 × `t3.large`      |
-| RDS                  | `db.t3.micro`, single-AZ, no final snapshot | `db.t3.small`, Multi-AZ, final snapshot |
+| RDS                  | `db.t3.micro`, single-AZ, 1-day backups, no final snapshot | `db.t3.small`, Multi-AZ, 7-day backups, final snapshot |
 | CloudFront price     | `PriceClass_100`     | `PriceClass_All`      |
 
 ## Deploy

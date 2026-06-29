@@ -30,10 +30,16 @@ provider "aws" {
   }
 }
 
+locals {
+  # Resource naming pattern: hosting-platform-{environment}-{resource}
+  # (see docs/12 "Terraform Conventions").
+  name_prefix = "hosting-platform-${var.environment}"
+}
+
 module "vpc" {
   source = "../../modules/vpc"
 
-  name_prefix = "hosting-platform-${var.environment}"
+  name_prefix = local.name_prefix
   vpc_cidr    = var.vpc_cidr
   az_count    = var.az_count
 }
@@ -41,7 +47,7 @@ module "vpc" {
 module "eks" {
   source = "../../modules/eks"
 
-  name_prefix        = "hosting-platform-${var.environment}"
+  name_prefix        = local.name_prefix
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
 }
@@ -49,7 +55,7 @@ module "eks" {
 module "rds" {
   source = "../../modules/rds"
 
-  name_prefix         = "hosting-platform-${var.environment}"
+  name_prefix         = local.name_prefix
   vpc_id              = module.vpc.vpc_id
   private_subnet_ids  = module.vpc.private_subnet_ids
   allowed_cidr_blocks = [var.vpc_cidr]
@@ -71,7 +77,7 @@ module "cloudfront" {
 module "iam" {
   source = "../../modules/iam"
 
-  name_prefix                = "hosting-platform-${var.environment}"
+  name_prefix                = local.name_prefix
   hosting_bucket_arn         = module.s3.bucket_arn
   cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
 }
