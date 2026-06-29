@@ -56,4 +56,10 @@ module "rds" {
   db_password         = var.db_password
 }
 
-# Further module invocations are added as modules are implemented (Tasks 47–49)
+module "s3" {
+  source = "../../modules/s3"
+
+  bucket_name = var.hosting_bucket_name
+}
+
+# Further module invocations are added as modules are implemented (Tasks 48–49)

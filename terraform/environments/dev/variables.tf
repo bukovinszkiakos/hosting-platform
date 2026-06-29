@@ -49,3 +49,13 @@ variable "db_password" {
     error_message = "db_password must be at least 8 characters."
   }
 }
+
+variable "hosting_bucket_name" {
+  type        = string
+  description = "Globally unique name of the S3 hosting bucket for generated static websites"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.hosting_bucket_name))
+    error_message = "hosting_bucket_name must be a valid S3 bucket name."
+  }
+}

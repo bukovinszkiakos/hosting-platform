@@ -38,4 +38,14 @@ output "rds_database_name" {
   value       = module.rds.database_name
 }
 
-# Further outputs are added as modules are implemented (Tasks 47–49)
+output "s3_bucket_name" {
+  description = "Name of the S3 hosting bucket"
+  value       = module.s3.bucket_name
+}
+
+output "s3_bucket_arn" {
+  description = "ARN of the S3 hosting bucket"
+  value       = module.s3.bucket_arn
+}
+
+# Further outputs are added as modules are implemented (Tasks 48–49)
