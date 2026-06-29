@@ -38,3 +38,14 @@ variable "az_count" {
     error_message = "az_count must be between 2 and 3."
   }
 }
+
+variable "db_password" {
+  type        = string
+  description = "Master password for the RDS PostgreSQL database. Provide via TF_VAR_db_password; never commit it."
+  sensitive   = true
+
+  validation {
+    condition     = length(var.db_password) >= 8
+    error_message = "db_password must be at least 8 characters."
+  }
+}

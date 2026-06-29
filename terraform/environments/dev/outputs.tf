@@ -28,4 +28,14 @@ output "eks_node_group_name" {
   value       = module.eks.node_group_name
 }
 
-# Further outputs are added as modules are implemented (Tasks 46–49)
+output "rds_database_endpoint" {
+  description = "Connection endpoint of the RDS PostgreSQL instance"
+  value       = module.rds.database_endpoint
+}
+
+output "rds_database_name" {
+  description = "Name of the RDS PostgreSQL database"
+  value       = module.rds.database_name
+}
+
+# Further outputs are added as modules are implemented (Tasks 47–49)

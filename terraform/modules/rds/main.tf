@@ -1,0 +1,66 @@
+# RDS module: PostgreSQL database in the private subnets, reachable only from
+# within the VPC (see docs/04-database.md, docs/05-aws-architecture.md, and
+# docs/06-terraform.md "RDS Module"). The database is never publicly accessible.
+
+resource "aws_db_subnet_group" "this" {
+  name       = "${var.name_prefix}-db"
+  subnet_ids = var.private_subnet_ids
+
+  tags = {
+    Name = "${var.name_prefix}-db-subnet-group"
+  }
+}
+
+# Security group: allow PostgreSQL (5432) only from the configured CIDR blocks
+# (the VPC), so private workloads such as the EKS nodes can connect while the
+# database stays unreachable from the internet.
+resource "aws_security_group" "this" {
+  name        = "${var.name_prefix}-rds"
+  description = "Allow PostgreSQL access from within the VPC"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description = "PostgreSQL from allowed CIDR blocks"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_cidr_blocks
+  }
+
+  egress {
+    description = "Allow all outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-rds"
+  }
+}
+
+resource "aws_db_instance" "this" {
+  identifier     = "${var.name_prefix}-postgres"
+  engine         = "postgres"
+  engine_version = var.engine_version
+  instance_class = var.instance_class
+
+  allocated_storage = var.allocated_storage
+  storage_encrypted = true
+
+  db_name  = var.db_name
+  username = var.db_username
+  password = var.db_password
+
+  db_subnet_group_name   = aws_db_subnet_group.this.name
+  vpc_security_group_ids = [aws_security_group.this.id]
+
+  multi_az            = var.multi_az
+  publicly_accessible = false
+  skip_final_snapshot = var.skip_final_snapshot
+
+  tags = {
+    Name = "${var.name_prefix}-postgres"
+  }
+}

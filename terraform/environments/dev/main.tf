@@ -46,4 +46,14 @@ module "eks" {
   private_subnet_ids = module.vpc.private_subnet_ids
 }
 
-# Further module invocations are added as modules are implemented (Tasks 46–49)
+module "rds" {
+  source = "../../modules/rds"
+
+  name_prefix         = "hosting-platform-${var.environment}"
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  allowed_cidr_blocks = [var.vpc_cidr]
+  db_password         = var.db_password
+}
+
+# Further module invocations are added as modules are implemented (Tasks 47–49)
