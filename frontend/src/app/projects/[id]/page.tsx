@@ -204,36 +204,38 @@ function DeploymentHistory({ deployments }: { deployments: Deployment[] }) {
       ) : (
         <ul className="mt-3 flex flex-col gap-3">
           {deployments.map((deployment, index) => (
-            <li
-              key={deployment.id}
-              className="rounded-xl border border-border bg-card p-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  {/* Newest first, so the oldest deployment is #1. */}
-                  <span className="text-sm font-semibold">
-                    Deploy #{deployments.length - index}
-                  </span>
-                  <StatusBadge status={deployment.status} />
+            <li key={deployment.id}>
+              <Link
+                href={`/deployments/${deployment.id}`}
+                className="block rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/50"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {/* Newest first, so the oldest deployment is #1. */}
+                    <span className="text-sm font-semibold">
+                      Deploy #{deployments.length - index}
+                    </span>
+                    <StatusBadge status={deployment.status} />
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatDateTime(deployment.startedAt)}
+                    {deployment.finishedAt
+                      ? ` — ${formatDateTime(deployment.finishedAt)}`
+                      : ""}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {formatDateTime(deployment.startedAt)}
-                  {deployment.finishedAt
-                    ? ` — ${formatDateTime(deployment.finishedAt)}`
-                    : ""}
-                </div>
-              </div>
 
-              {deployment.buildSummary && (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {deployment.buildSummary}
-                </p>
-              )}
-              {deployment.errorMessage && (
-                <p className="mt-2 text-sm text-destructive">
-                  {deployment.errorMessage}
-                </p>
-              )}
+                {deployment.buildSummary && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {deployment.buildSummary}
+                  </p>
+                )}
+                {deployment.errorMessage && (
+                  <p className="mt-2 text-sm text-destructive">
+                    {deployment.errorMessage}
+                  </p>
+                )}
+              </Link>
             </li>
           ))}
         </ul>
