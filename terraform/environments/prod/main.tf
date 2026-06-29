@@ -30,4 +30,63 @@ provider "aws" {
   }
 }
 
-# Module invocations are added as modules are implemented (Tasks 44–49)
+module "vpc" {
+  source = "../../modules/vpc"
+
+  name_prefix = "hosting-platform-${var.environment}"
+  vpc_cidr    = var.vpc_cidr
+  az_count    = var.az_count
+}
+
+module "eks" {
+  source = "../../modules/eks"
+
+  name_prefix        = "hosting-platform-${var.environment}"
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  # Production headroom (dev relies on the smaller module defaults).
+  node_instance_types = ["t3.large"]
+  node_desired_size   = 3
+  node_min_size       = 2
+  node_max_size       = 5
+}
+
+module "rds" {
+  source = "../../modules/rds"
+
+  name_prefix         = "hosting-platform-${var.environment}"
+  vpc_id              = module.vpc.vpc_id
+  private_subnet_ids  = module.vpc.private_subnet_ids
+  allowed_cidr_blocks = [var.vpc_cidr]
+  db_password         = var.db_password
+
+  # Production durability/availability (dev relies on the cheaper defaults).
+  instance_class      = "db.t3.small"
+  allocated_storage   = 50
+  multi_az            = true
+  skip_final_snapshot = false
+}
+
+module "s3" {
+  source = "../../modules/s3"
+
+  bucket_name = var.hosting_bucket_name
+}
+
+module "cloudfront" {
+  source = "../../modules/cloudfront"
+
+  bucket_name = module.s3.bucket_name
+
+  # Serve from all edge locations in production.
+  price_class = "PriceClass_All"
+}
+
+module "iam" {
+  source = "../../modules/iam"
+
+  name_prefix                = "hosting-platform-${var.environment}"
+  hosting_bucket_arn         = module.s3.bucket_arn
+  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+}
