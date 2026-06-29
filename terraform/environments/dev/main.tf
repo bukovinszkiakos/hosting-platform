@@ -30,4 +30,12 @@ provider "aws" {
   }
 }
 
-# Module invocations are added as modules are implemented (Tasks 44–49)
+module "vpc" {
+  source = "../../modules/vpc"
+
+  name_prefix = "hosting-platform-${var.environment}"
+  vpc_cidr    = var.vpc_cidr
+  az_count    = var.az_count
+}
+
+# Further module invocations are added as modules are implemented (Tasks 45–49)
