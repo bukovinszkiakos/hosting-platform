@@ -62,4 +62,10 @@ module "s3" {
   bucket_name = var.hosting_bucket_name
 }
 
-# Further module invocations are added as modules are implemented (Tasks 48–49)
+module "cloudfront" {
+  source = "../../modules/cloudfront"
+
+  bucket_name = module.s3.bucket_name
+}
+
+# Further module invocations are added as modules are implemented (Task 49)

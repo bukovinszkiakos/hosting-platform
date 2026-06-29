@@ -48,4 +48,14 @@ output "s3_bucket_arn" {
   value       = module.s3.bucket_arn
 }
 
-# Further outputs are added as modules are implemented (Tasks 48–49)
+output "cloudfront_domain_name" {
+  description = "Domain name of the CloudFront distribution"
+  value       = module.cloudfront.cloudfront_domain_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "ID of the CloudFront distribution (used for cache invalidation)"
+  value       = module.cloudfront.cloudfront_distribution_id
+}
+
+# Further outputs are added as modules are implemented (Task 49)
