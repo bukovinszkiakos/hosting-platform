@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { FolderGit2, Plus } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -243,7 +244,12 @@ function ProjectCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <FolderGit2 className="size-4 shrink-0 text-muted-foreground" />
-            <h3 className="truncate text-base font-semibold">{project.name}</h3>
+            <Link
+              href={`/projects/${project.id}`}
+              className="truncate text-base font-semibold hover:underline"
+            >
+              {project.name}
+            </Link>
             <StatusBadge status={project.currentStatus} />
           </div>
 
