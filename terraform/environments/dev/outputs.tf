@@ -58,4 +58,7 @@ output "cloudfront_distribution_id" {
   value       = module.cloudfront.cloudfront_distribution_id
 }
 
-# Further outputs are added as modules are implemented (Task 49)
+output "backend_role_arn" {
+  description = "ARN of the backend service IAM role"
+  value       = module.iam.backend_role_arn
+}

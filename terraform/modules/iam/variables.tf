@@ -1,0 +1,29 @@
+variable "name_prefix" {
+  type        = string
+  description = "Prefix applied to IAM resource names (e.g. hosting-platform-dev)."
+
+  validation {
+    condition     = length(var.name_prefix) > 0
+    error_message = "name_prefix must not be empty."
+  }
+}
+
+variable "hosting_bucket_arn" {
+  type        = string
+  description = "ARN of the S3 hosting bucket the backend uploads static sites to."
+
+  validation {
+    condition     = can(regex("^arn:aws:s3:::", var.hosting_bucket_arn))
+    error_message = "hosting_bucket_arn must be a valid S3 bucket ARN (arn:aws:s3:::...)."
+  }
+}
+
+variable "cloudfront_distribution_id" {
+  type        = string
+  description = "ID of the CloudFront distribution the backend invalidates after a deployment."
+
+  validation {
+    condition     = length(var.cloudfront_distribution_id) > 0
+    error_message = "cloudfront_distribution_id must not be empty."
+  }
+}

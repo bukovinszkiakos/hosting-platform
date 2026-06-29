@@ -68,4 +68,10 @@ module "cloudfront" {
   bucket_name = module.s3.bucket_name
 }
 
-# Further module invocations are added as modules are implemented (Task 49)
+module "iam" {
+  source = "../../modules/iam"
+
+  name_prefix                = "hosting-platform-${var.environment}"
+  hosting_bucket_arn         = module.s3.bucket_arn
+  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+}
