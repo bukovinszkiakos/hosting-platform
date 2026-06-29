@@ -13,4 +13,19 @@ output "private_subnet_ids" {
   value       = module.vpc.private_subnet_ids
 }
 
-# Further outputs are added as modules are implemented (Tasks 45–49)
+output "eks_cluster_name" {
+  description = "Name of the EKS cluster"
+  value       = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "API server endpoint of the EKS cluster"
+  value       = module.eks.cluster_endpoint
+}
+
+output "eks_node_group_name" {
+  description = "Name of the EKS managed node group"
+  value       = module.eks.node_group_name
+}
+
+# Further outputs are added as modules are implemented (Tasks 46–49)

@@ -38,4 +38,12 @@ module "vpc" {
   az_count    = var.az_count
 }
 
-# Further module invocations are added as modules are implemented (Tasks 45–49)
+module "eks" {
+  source = "../../modules/eks"
+
+  name_prefix        = "hosting-platform-${var.environment}"
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+}
+
+# Further module invocations are added as modules are implemented (Tasks 46–49)
