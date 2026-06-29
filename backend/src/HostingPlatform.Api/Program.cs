@@ -60,6 +60,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IDeploymentService, DeploymentService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 // Stateless build Job specification generator (Task 25); consumed by the
 // Kubernetes Job creation service in Task 26.

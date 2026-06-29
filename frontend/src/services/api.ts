@@ -62,6 +62,23 @@ export interface DashboardSummary {
   failedProjects: number;
 }
 
+export interface AdminUser {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface AdminProject {
+  id: string;
+  name: string;
+  repositoryUrl: string;
+  currentStatus: string;
+  ownerEmail: string;
+  createdAt: string;
+}
+
 export interface MessageResponse {
   message: string;
 }
@@ -201,5 +218,12 @@ export const api = {
   },
   dashboard: {
     get: (signal?: AbortSignal) => apiFetch<DashboardSummary>("/api/dashboard", { signal }),
+  },
+  admin: {
+    users: (signal?: AbortSignal) => apiFetch<AdminUser[]>("/api/admin/users", { signal }),
+    projects: (signal?: AbortSignal) =>
+      apiFetch<AdminProject[]>("/api/admin/projects", { signal }),
+    deployments: (signal?: AbortSignal) =>
+      apiFetch<Deployment[]>("/api/admin/deployments", { signal }),
   },
 };
