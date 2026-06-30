@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ExternalLink, Rocket } from "lucide-react";
+import { ArrowLeft, ExternalLink, Pencil, Rocket } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   api,
@@ -120,6 +122,7 @@ function ProjectDetailsView() {
                 deploying={deploying}
                 deployError={deployError}
                 onDeploy={handleDeploy}
+                onUpdated={setProject}
               />
               <DeploymentHistory deployments={deployments} />
             </div>
@@ -135,12 +138,16 @@ function ProjectInformation({
   deploying,
   deployError,
   onDeploy,
+  onUpdated,
 }: {
   project: Project;
   deploying: boolean;
   deployError: string | null;
   onDeploy: () => void;
+  onUpdated: (project: Project) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+
   return (
     <div className="rounded-xl border border-border bg-card p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -150,38 +157,59 @@ function ProjectInformation({
             <StatusBadge status={project.currentStatus} />
           </div>
         </div>
-        <Button onClick={onDeploy} disabled={deploying}>
-          <Rocket />
-          {deploying ? "Deploying…" : "Deploy"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setEditing((value) => !value)}
+            disabled={deploying || editing}
+          >
+            <Pencil />
+            Edit
+          </Button>
+          <Button onClick={onDeploy} disabled={deploying}>
+            <Rocket />
+            {deploying ? "Deploying…" : "Deploy"}
+          </Button>
+        </div>
       </div>
 
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Field label="Repository URL">
-          {project.repositoryUrl ? (
-            <span className="break-all">{project.repositoryUrl}</span>
-          ) : (
-            <span className="text-muted-foreground">Not set</span>
-          )}
-        </Field>
-        <Field label="Website URL">
-          {project.websiteUrl ? (
-            <a
-              href={project.websiteUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 break-all font-medium text-primary hover:underline"
-            >
-              {project.websiteUrl}
-              <ExternalLink className="size-3.5 shrink-0" />
-            </a>
-          ) : (
-            <span className="text-muted-foreground">Not published yet</span>
-          )}
-        </Field>
-        <Field label="Current Status">{project.currentStatus}</Field>
-        <Field label="Last Updated">{formatDateTime(project.updatedAt)}</Field>
-      </dl>
+      {editing ? (
+        <EditProjectForm
+          project={project}
+          onCancel={() => setEditing(false)}
+          onUpdated={(updated) => {
+            onUpdated(updated);
+            setEditing(false);
+          }}
+        />
+      ) : (
+        <dl className="mt-6 grid gap-4 sm:grid-cols-2">
+          <Field label="Repository URL">
+            {project.repositoryUrl ? (
+              <span className="break-all">{project.repositoryUrl}</span>
+            ) : (
+              <span className="text-muted-foreground">Not set</span>
+            )}
+          </Field>
+          <Field label="Website URL">
+            {project.websiteUrl ? (
+              <a
+                href={project.websiteUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 break-all font-medium text-primary hover:underline"
+              >
+                {project.websiteUrl}
+                <ExternalLink className="size-3.5 shrink-0" />
+              </a>
+            ) : (
+              <span className="text-muted-foreground">Not published yet</span>
+            )}
+          </Field>
+          <Field label="Current Status">{project.currentStatus}</Field>
+          <Field label="Last Updated">{formatDateTime(project.updatedAt)}</Field>
+        </dl>
+      )}
 
       {deployError && (
         <p role="alert" className="mt-4 text-sm text-destructive">
@@ -189,6 +217,95 @@ function ProjectInformation({
         </p>
       )}
     </div>
+  );
+}
+
+function EditProjectForm({
+  project,
+  onUpdated,
+  onCancel,
+}: {
+  project: Project;
+  onUpdated: (project: Project) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(project.name);
+  const [repositoryUrl, setRepositoryUrl] = useState(project.repositoryUrl);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+
+    if (!name.trim() || !repositoryUrl.trim()) {
+      setError("Project name and repository URL are required.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const updated = await api.projects.update(project.id, {
+        name: name.trim(),
+        repositoryUrl: repositoryUrl.trim(),
+      });
+      onUpdated(updated);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message || "Failed to update the project."
+          : "Something went wrong. Please try again.",
+      );
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4" noValidate>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="edit-name">Project name</Label>
+        <Input
+          id="edit-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          aria-invalid={error !== null}
+          disabled={submitting}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="edit-repositoryUrl">Repository URL</Label>
+        <Input
+          id="edit-repositoryUrl"
+          type="url"
+          value={repositoryUrl}
+          onChange={(e) => setRepositoryUrl(e.target.value)}
+          aria-invalid={error !== null}
+          disabled={submitting}
+        />
+      </div>
+
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Saving…" : "Save changes"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={submitting}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 
