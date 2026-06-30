@@ -77,6 +77,10 @@ Stores user projects.
 | CreatedAt     | TIMESTAMP | Creation timestamp          |
 | UpdatedAt     | TIMESTAMP | Last modification timestamp |
 
+> `CurrentStatus` mirrors the project's latest deployment status (see Deployment
+> Status Values below). A newly created project that has never been deployed has
+> the status `Draft`.
+
 ## Example
 
 ```text
@@ -159,7 +163,9 @@ package.json not found
 
 Stores simple log messages produced during a deployment.
 
-> Note: This schema is provisional. It is inferred from the current implementation (the `DeploymentLog` entity) and related documentation (doc 12), not from the original database specification. It may still change before the initial migration if the documentation evolves.
+> Note: This table is part of the applied initial migration. Build pod output is
+> collected and stored as `DeploymentLog` records by the deployment build worker
+> (see doc 10 "Deployment Orchestration" and doc 12 "Build Logs").
 
 ## Fields
 

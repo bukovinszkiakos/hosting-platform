@@ -95,29 +95,29 @@ The following data is stored:
 
 # Step 3 - Repository Validation
 
-The backend validates:
+When a deployment is created, the backend validates that the project has a
+repository URL (a project with no URL cannot be deployed).
 
-## Repository Exists
+Deeper repository validation is performed during the build, not as a separate
+pre-flight check:
 
-Whether the GitHub repository exists.
+## Repository Exists / Is Accessible
+
+The build Job clones the repository (`git clone`). If the repository does not
+exist or cannot be cloned, the clone fails and the deployment becomes `Failed`.
 
 ---
 
 ## Repository Is Public
 
-The MVP supports public repositories only.
+The MVP supports public repositories only. Private repositories fail to clone
+(no credentials are provided), which results in a `Failed` deployment.
 
 ---
 
-## Repository URL Valid
-
-Whether the provided URL is a valid GitHub repository.
-
----
-
-## Project Accessible
-
-Whether the repository can be accessed and cloned.
+> A dedicated pre-clone validation step (verifying existence / visibility before
+> creating the Job) is a future enhancement; in the MVP an invalid repository is
+> surfaced as a failed build with the clone error in the deployment logs.
 
 ---
 

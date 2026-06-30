@@ -254,7 +254,11 @@ PUT /api/projects/{id}
 DELETE /api/projects/{id}
 ```
 
-The project and all related deployment history records are removed.
+The project and all related deployment history records are removed. The
+project's published files are also deleted from S3 and its CloudFront cache is
+invalidated, so the site is no longer served (see `02-features.md` "Delete
+Project"). Storage/CDN cleanup is best-effort: a transient failure is logged and
+does not block deletion of the record.
 
 ---
 

@@ -242,7 +242,7 @@ Displayed information:
 Projects Count
 Deployments Count
 Online Projects
-Failed Deployments
+Failed Projects
 ```
 
 ---

@@ -13,10 +13,20 @@ public class ProjectService : IProjectService
     private const string InitialStatus = "Draft";
 
     private readonly AppDbContext _context;
+    private readonly IS3Service _s3;
+    private readonly ICloudFrontService _cloudFront;
+    private readonly ILogger<ProjectService> _logger;
 
-    public ProjectService(AppDbContext context)
+    public ProjectService(
+        AppDbContext context,
+        IS3Service s3,
+        ICloudFrontService cloudFront,
+        ILogger<ProjectService> logger)
     {
         _context = context;
+        _s3 = s3;
+        _cloudFront = cloudFront;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<ProjectResponse>> GetProjectsAsync(Guid userId)
@@ -81,6 +91,22 @@ public class ProjectService : IProjectService
     public async Task DeleteProjectAsync(Guid userId, Guid projectId)
     {
         var project = await FindOwnedAsync(userId, projectId);
+
+        // Remove the published site so a deleted project is no longer served
+        // (docs/02-features.md "Delete Project"). Best-effort: a storage/CDN error
+        // must not block the user's deletion, so it is logged rather than thrown.
+        // Deployment history rows are removed by the cascading FK (see migration).
+        try
+        {
+            await _s3.DeleteSiteAsync(userId, projectId);
+            await _cloudFront.InvalidateProjectAsync(userId, projectId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to remove published files for project {ProjectId}; deleting the record anyway",
+                projectId);
+        }
 
         _context.Projects.Remove(project);
         await _context.SaveChangesAsync();

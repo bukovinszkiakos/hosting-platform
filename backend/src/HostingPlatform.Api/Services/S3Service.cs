@@ -34,4 +34,36 @@ public class S3Service : IS3Service
 
         await _s3.PutObjectAsync(request, cancellationToken);
     }
+
+    public async Task DeleteSiteAsync(
+        Guid userId, Guid projectId, CancellationToken cancellationToken = default)
+    {
+        var prefix = GetSiteKeyPrefix(userId, projectId);
+        string? continuationToken = null;
+
+        // List and delete in pages: a published site can contain more than the
+        // 1000 keys a single ListObjectsV2 / DeleteObjects call handles.
+        do
+        {
+            var listed = await _s3.ListObjectsV2Async(new ListObjectsV2Request
+            {
+                BucketName = _aws.BucketName,
+                Prefix = prefix,
+                ContinuationToken = continuationToken,
+            }, cancellationToken);
+
+            var keys = listed.S3Objects;
+            if (keys is { Count: > 0 })
+            {
+                await _s3.DeleteObjectsAsync(new DeleteObjectsRequest
+                {
+                    BucketName = _aws.BucketName,
+                    Objects = keys.Select(o => new KeyVersion { Key = o.Key }).ToList(),
+                }, cancellationToken);
+            }
+
+            continuationToken = listed.IsTruncated == true ? listed.NextContinuationToken : null;
+        }
+        while (continuationToken is not null);
+    }
 }
