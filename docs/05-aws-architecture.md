@@ -195,6 +195,15 @@ hosting-platform
 
 Users access published websites through CloudFront URLs.
 
+Because each site is served under `/{userId}/{projectId}/` (not the distribution
+root), a CloudFront Function rewrites directory requests to the site's
+`index.html`, so the public URL resolves correctly:
+
+```text
+/{userId}/{projectId}      -> /{userId}/{projectId}/index.html
+/{userId}/{projectId}/     -> /{userId}/{projectId}/index.html
+```
+
 ---
 
 # NAT Gateway

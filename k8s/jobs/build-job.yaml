@@ -26,11 +26,16 @@ spec:
       serviceAccountName: hosting-platform
       containers:
         - name: build
-          image: node:20-slim # must also provide git + AWS CLI v2 (docs/12 Build Environment)
+          image: node:20-slim # git + AWS CLI v2 are installed at runtime below (docs/12 Build Environment)
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -e
+              apt-get update
+              apt-get install -y --no-install-recommends git curl unzip ca-certificates
+              curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+              unzip -q /tmp/awscliv2.zip -d /tmp
+              /tmp/aws/install
               git clone --depth 1 "$REPOSITORY_URL" /workspace
               cd /workspace
               if [ -f package.json ]; then

@@ -137,6 +137,8 @@ hosting-platform
 * HTTPS support
 * Caching
 * CDN functionality
+* Directory-to-`index.html` rewrite via a CloudFront Function (sites are served
+  under `/{userId}/{projectId}/`)
 
 Users access published websites through a CloudFront URL.
 

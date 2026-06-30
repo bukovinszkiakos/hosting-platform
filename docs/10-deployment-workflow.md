@@ -316,6 +316,11 @@ https://xxxxx.cloudfront.net/user-id/project-id
 
 The URL is stored in the Project record.
 
+This URL points at a "directory" rather than a file. A CloudFront Function
+rewrites such requests to the site's `index.html`
+(`/user-id/project-id` -> `/user-id/project-id/index.html`), so the published
+site loads at the stored URL (see `05-aws-architecture.md` "CloudFront").
+
 ---
 
 # Step 13 - Complete Deployment

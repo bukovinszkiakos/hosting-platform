@@ -46,8 +46,9 @@ This document acts as the implementation source of truth alongside the architect
 # Build Environment
 
 * Docker
-* node:20-slim
-* AWS CLI v2
+* node:20-slim (base build image)
+* git and AWS CLI v2 — installed by the build script at container start, since
+  `node:20-slim` does not include them (a prebuilt image is a future optimization)
 
 ---
 

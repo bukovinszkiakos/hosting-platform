@@ -10,9 +10,9 @@ namespace HostingPlatform.Api.Services;
 // (KubernetesJobService).
 public class BuildJobSpecFactory : IBuildJobSpecFactory
 {
-    // Default build image (docs/07-kubernetes.md "Build Image"). The image is also
-    // expected to provide git and the AWS CLI v2 (docs/12 "Build Environment"),
-    // which the build script below relies on.
+    // Default build image (docs/07-kubernetes.md "Build Image"). node:20-slim does
+    // not ship git or the AWS CLI v2, so the build script installs both at container
+    // start (docs/12 "Build Environment"). A prebuilt image is a future optimization.
     private const string BuildImage = "node:20-slim";
 
     private const string ContainerName = "build";
@@ -102,9 +102,18 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
 
     // The documented build process (docs/10-deployment-workflow.md Steps 5-11),
     // reading the values defined in BuildJobEnvironment.
+    //
+    // node:20-slim (Debian) ships without git or the AWS CLI, so both are installed
+    // first. The AWS CLI v2 archive is selected per architecture so the script works
+    // on x86_64 and Graviton nodes alike.
     private const string BuildScript =
         """
         set -e
+        apt-get update
+        apt-get install -y --no-install-recommends git curl unzip ca-certificates
+        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+        unzip -q /tmp/awscliv2.zip -d /tmp
+        /tmp/aws/install
         git clone --depth 1 "$REPOSITORY_URL" /workspace
         cd /workspace
         if [ -f package.json ]; then

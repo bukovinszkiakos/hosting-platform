@@ -230,6 +230,9 @@ Purpose:
 
 * Create CloudFront Distribution
 * Configure S3 Origin
+* Attach a CloudFront Function that rewrites directory requests to `index.html`
+  (sites are served under `/{userId}/{projectId}/`, where `default_root_object`
+  does not apply)
 
 ## Inputs
 
@@ -238,6 +241,7 @@ Purpose:
 ## Outputs
 
 * cloudfront_domain_name
+* cloudfront_distribution_id
 
 ---
 

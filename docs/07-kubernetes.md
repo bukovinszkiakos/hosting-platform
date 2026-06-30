@@ -176,11 +176,17 @@ The default image used by the Job:
 node:20-slim
 ```
 
+`node:20-slim` does not include `git` or the AWS CLI v2, so the build script
+installs both at container start before cloning and publishing. Baking them into
+a prebuilt image (ECR) is a future optimization.
+
 ---
 
 # Build Process Example
 
 ```bash
+apt-get install -y git curl unzip   # node:20-slim lacks these
+install AWS CLI v2
 git clone
 npm install
 npm run build
