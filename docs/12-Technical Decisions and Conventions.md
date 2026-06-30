@@ -108,6 +108,26 @@ Services should use dependency injection through constructors.
 
 ---
 
+# Background Services
+
+Long-running, out-of-request work uses ASP.NET Core hosted services
+(`BackgroundService`), not external job schedulers or message brokers.
+
+The deployment build pipeline follows this convention:
+
+* `DeploymentQueue` – an in-memory `System.Threading.Channels` queue of
+  deployment ids, registered as a singleton.
+* `DeploymentBuildWorker` – a hosted `BackgroundService` that drains the queue
+  and orchestrates each deployment by reusing the existing scoped services.
+
+Because a hosted service is a singleton, it must resolve scoped services
+(`AppDbContext`, `IDeploymentService`, …) through `IServiceScopeFactory`,
+creating one scope per unit of work.
+
+See `10-deployment-workflow.md` "Deployment Orchestration".
+
+---
+
 # Dependency Injection
 
 All services must be registered using ASP.NET Core Dependency Injection.

@@ -59,6 +59,11 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IDeploymentService, DeploymentService>();
+
+// In-process build orchestration: deployments are queued on creation and driven
+// through their lifecycle by a background worker (docs/10 "Deployment Orchestration").
+builder.Services.AddSingleton<IDeploymentQueue, DeploymentQueue>();
+builder.Services.AddHostedService<DeploymentBuildWorker>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 

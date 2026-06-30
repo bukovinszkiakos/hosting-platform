@@ -123,7 +123,9 @@ Whether the repository can be accessed and cloned.
 
 # Step 4 - Create Kubernetes Job
 
-The backend creates a Kubernetes Job.
+After the deployment record is created, the backend queues it for processing.
+A background worker then creates the Kubernetes Job (see "Deployment
+Orchestration" below).
 
 The Job receives:
 
@@ -427,6 +429,61 @@ Failed
 
 ---
 
+# Deployment Orchestration
+
+Steps 4–13 are **not** executed inline by the request that creates the
+deployment. The `POST /api/projects/{id}/deploy` handler only creates the
+`Pending` deployment record and returns `201` immediately. The build lifecycle
+is then driven asynchronously by an in-process background worker.
+
+## Components
+
+* **DeploymentQueue** – an in-memory queue (`System.Threading.Channels`) of
+  deployment ids awaiting processing, registered as a singleton. No external
+  broker (Redis, SQS, RabbitMQ, …) is used.
+* **DeploymentBuildWorker** – a hosted `BackgroundService` that drains the
+  queue and orchestrates one deployment at a time. It does not contain build
+  logic of its own; it reuses the existing `DeploymentService`,
+  `KubernetesJobService` and `CloudFrontService`.
+
+## Flow
+
+```text
+CreateDeploymentAsync()                 (Pending record saved)
+  → DeploymentQueue.Enqueue(deploymentId)
+  → return 201
+
+DeploymentBuildWorker dequeues deploymentId
+  → UpdateStatus(Building)
+  → KubernetesJobService.CreateBuildJob()        (Step 4)
+  → poll GetBuildJobState() until terminal        (Steps 5–11 run inside the Job)
+  → CollectBuildLogs()                            (best effort)
+  → on success: UpdateStatus(Deploying)
+                UpdateStatus(Online) + WebsiteUrl (Steps 12–13)
+  → on failure or timeout: UpdateStatus(Failed)
+```
+
+The build Job itself performs the git clone, framework detection, build, S3
+upload and CloudFront invalidation (Steps 5–11). The worker only creates the
+Job, polls it to completion, collects its logs, and records the resulting
+status. On success the public URL is produced by
+`CloudFrontService.GetPublicUrl` (`https://{domain}/{userId}/{projectId}`) and
+stored on the project (Step 12).
+
+## MVP Limitations
+
+* The queue is in-memory and per-pod: a deployment is processed by the same
+  backend pod that accepted the request. If that pod restarts mid-build, the
+  deployment is left in `Building` and is not automatically retried.
+* Deployments are processed one at a time per pod.
+* A failed build is not retried (`backoffLimit: 0`); it becomes a `Failed`
+  deployment.
+
+These trade-offs keep the MVP free of additional infrastructure. Durable
+queuing and automatic retry are listed under Future Enhancements.
+
+---
+
 # Redeployment Workflow
 
 Users can start a new deployment at any time.
@@ -457,3 +514,4 @@ Future versions may include:
 * Build Cache
 * Multi Framework Support
 * Container Deployments
+* Durable deployment queue with automatic retry

@@ -148,7 +148,8 @@ Memory: 1Gi
 
 # Build Jobs
 
-Whenever a deployment is started, the backend creates a Kubernetes Job.
+Whenever a deployment is started, the backend's in-process build worker creates
+a Kubernetes Job (see `10-deployment-workflow.md` "Deployment Orchestration").
 
 Each deployment runs as a separate Job.
 

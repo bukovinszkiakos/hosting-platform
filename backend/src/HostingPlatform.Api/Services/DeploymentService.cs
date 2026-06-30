@@ -10,11 +10,16 @@ public class DeploymentService : IDeploymentService
 {
     private readonly AppDbContext _context;
     private readonly IKubernetesJobService _kubernetesJobService;
+    private readonly IDeploymentQueue _queue;
 
-    public DeploymentService(AppDbContext context, IKubernetesJobService kubernetesJobService)
+    public DeploymentService(
+        AppDbContext context,
+        IKubernetesJobService kubernetesJobService,
+        IDeploymentQueue queue)
     {
         _context = context;
         _kubernetesJobService = kubernetesJobService;
+        _queue = queue;
     }
 
     public async Task<DeploymentResponse> CreateDeploymentAsync(Guid userId, Guid projectId)
@@ -48,6 +53,9 @@ public class DeploymentService : IDeploymentService
         project.UpdatedAt = now;
 
         await _context.SaveChangesAsync();
+
+        // Hand the deployment to the background build worker (see DeploymentBuildWorker).
+        _queue.Enqueue(deployment.Id);
 
         return ToResponse(deployment);
     }
@@ -88,7 +96,8 @@ public class DeploymentService : IDeploymentService
     }
 
     public async Task<DeploymentResponse> UpdateStatusAsync(
-        Guid deploymentId, string newStatus, string? buildSummary = null, string? errorMessage = null)
+        Guid deploymentId, string newStatus, string? buildSummary = null,
+        string? errorMessage = null, string? websiteUrl = null)
     {
         if (!DeploymentStatus.IsValid(newStatus))
         {
@@ -117,6 +126,7 @@ public class DeploymentService : IDeploymentService
         // Keep the project's status in sync with its latest deployment.
         deployment.Project.CurrentStatus = newStatus;
         deployment.Project.UpdatedAt = DateTime.UtcNow;
+        if (websiteUrl is not null) deployment.Project.WebsiteUrl = websiteUrl;
 
         await _context.SaveChangesAsync();
 

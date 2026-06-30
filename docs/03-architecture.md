@@ -70,6 +70,7 @@ The frontend communicates exclusively with the Backend API.
 * Authentication
 * Project Management
 * Deployment Management
+* Deployment Orchestration (in-process background worker)
 * GitHub Repository Validation
 * Kubernetes Job Creation
 * AWS Resource Management
@@ -199,7 +200,9 @@ The Backend API validates:
 
 ## Step 3
 
-The Backend creates a Kubernetes Build Job.
+The Backend saves the deployment as `Pending` and queues it. An in-process
+background worker then creates the Kubernetes Build Job and drives the
+deployment through its lifecycle (see `10-deployment-workflow.md`).
 
 ## Step 4
 
