@@ -1,40 +1,62 @@
-# This manifest is a reference template. The backend (BuildService) creates Job
-# objects programmatically via the Kubernetes API, using this spec as a guide.
+# Reference template only. The backend (BuildJobSpecFactory + KubernetesJobService)
+# creates Job objects programmatically via the Kubernetes API; this file documents
+# the equivalent spec and the documented build workflow
+# (docs/10-deployment-workflow.md Steps 5-11). Keep it in sync with
+# backend/.../Services/BuildJobSpecFactory.cs and BuildJobEnvironment.cs.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: build-job # overridden per deployment: build-<deployment-id>
+  name: build-job # BuildService sets the real name: build-<deployment-id>
   namespace: hosting-platform
   labels:
-    app: build-job
+    app: hosting-platform-build
+    deployment-id: "" # BuildService sets the deployment id
 spec:
-  ttlSecondsAfterFinished: 300
+  backoffLimit: 0 # single attempt; a failed build becomes a Failed deployment (no retry)
+  ttlSecondsAfterFinished: 3600 # auto-remove finished Jobs after 1 hour
   template:
     metadata:
       labels:
-        app: build-job
+        app: hosting-platform-build
+        deployment-id: "" # BuildService sets the deployment id
     spec:
       restartPolicy: Never
       containers:
         - name: build
-          image: node:20-slim
+          image: node:20-slim # must also provide git + AWS CLI v2 (docs/12 Build Environment)
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              git clone --depth 1 "$REPOSITORY_URL" /workspace
+              cd /workspace
+              if [ -f package.json ]; then
+                npm install
+                npm run build
+              fi
+              OUTPUT=.
+              for dir in dist build out; do
+                if [ -d "$dir" ]; then OUTPUT="$dir"; break; fi
+              done
+              aws s3 sync "$OUTPUT" "s3://$S3_BUCKET/$USER_ID/$PROJECT_ID/" --delete --exclude ".git/*"
+              aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/$USER_ID/$PROJECT_ID/*"
           env:
+            # Set dynamically by BuildService, per deployment
             - name: DEPLOYMENT_ID
-              value: "" # set dynamically by BuildService
+              value: ""
             - name: PROJECT_ID
-              value: "" # set dynamically by BuildService
+              value: ""
+            - name: USER_ID
+              value: ""
             - name: REPOSITORY_URL
-              value: "" # set dynamically by BuildService
+              value: ""
+            # Injected by BuildService from the backend AwsSettings configuration
             - name: S3_BUCKET
-              valueFrom:
-                configMapKeyRef:
-                  name: backend-config
-                  key: s3_bucket
+              value: ""
+            - name: AWS_REGION
+              value: ""
             - name: CLOUDFRONT_DISTRIBUTION_ID
-              valueFrom:
-                configMapKeyRef:
-                  name: backend-config
-                  key: cloudfront_distribution_id
+              value: ""
           resources:
             requests:
               cpu: 1000m
