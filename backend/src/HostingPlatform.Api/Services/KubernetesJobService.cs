@@ -8,12 +8,15 @@ namespace HostingPlatform.Api.Services;
 // this service is only responsible for submitting it to the cluster.
 public class KubernetesJobService : IKubernetesJobService
 {
-    private readonly IKubernetes _kubernetes;
+    // Lazy so constructing this service (e.g. via DeploymentService for a read/create
+    // endpoint) does not load the in-cluster configuration; it is read only when a
+    // method below actually calls the cluster. See KubernetesClientExtensions.
+    private readonly Lazy<IKubernetes> _kubernetes;
     private readonly IBuildJobSpecFactory _specFactory;
     private readonly ILogger<KubernetesJobService> _logger;
 
     public KubernetesJobService(
-        IKubernetes kubernetes,
+        Lazy<IKubernetes> kubernetes,
         IBuildJobSpecFactory specFactory,
         ILogger<KubernetesJobService> logger)
     {
@@ -22,12 +25,14 @@ public class KubernetesJobService : IKubernetesJobService
         _logger = logger;
     }
 
+    private IKubernetes Client => _kubernetes.Value;
+
     public async Task<V1Job> CreateBuildJobAsync(
         BuildJobParameters parameters, CancellationToken cancellationToken = default)
     {
         var job = _specFactory.Create(parameters);
 
-        var created = await _kubernetes.BatchV1.CreateNamespacedJobAsync(
+        var created = await Client.BatchV1.CreateNamespacedJobAsync(
             job, job.Metadata.NamespaceProperty, cancellationToken: cancellationToken);
 
         _logger.LogInformation(
@@ -40,7 +45,7 @@ public class KubernetesJobService : IKubernetesJobService
     public async Task<BuildJobState> GetBuildJobStateAsync(
         Guid deploymentId, CancellationToken cancellationToken = default)
     {
-        var job = await _kubernetes.BatchV1.ReadNamespacedJobAsync(
+        var job = await Client.BatchV1.ReadNamespacedJobAsync(
             BuildJobNaming.JobName(deploymentId), BuildJobNaming.Namespace,
             cancellationToken: cancellationToken);
 
@@ -80,7 +85,7 @@ public class KubernetesJobService : IKubernetesJobService
     public async Task<string> GetBuildJobLogsAsync(
         Guid deploymentId, CancellationToken cancellationToken = default)
     {
-        var pods = await _kubernetes.CoreV1.ListNamespacedPodAsync(
+        var pods = await Client.CoreV1.ListNamespacedPodAsync(
             BuildJobNaming.Namespace,
             labelSelector: BuildJobNaming.DeploymentLabelSelector(deploymentId),
             cancellationToken: cancellationToken);
@@ -91,7 +96,7 @@ public class KubernetesJobService : IKubernetesJobService
             return string.Empty;
         }
 
-        await using var stream = await _kubernetes.CoreV1.ReadNamespacedPodLogAsync(
+        await using var stream = await Client.CoreV1.ReadNamespacedPodLogAsync(
             pod.Metadata.Name, BuildJobNaming.Namespace, cancellationToken: cancellationToken);
         using var reader = new StreamReader(stream);
         return await reader.ReadToEndAsync(cancellationToken);

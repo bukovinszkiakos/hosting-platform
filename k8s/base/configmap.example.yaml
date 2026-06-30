@@ -1,0 +1,33 @@
+# Example (non-secret) configuration for the backend and frontend Deployments.
+# Copy to a real manifest, fill in the values (the AWS values come from the
+# Terraform outputs), and apply. Do NOT put the database connection string here —
+# that belongs in the Secret (see k8s/secrets/secret.example.yaml).
+#
+# These keys map to the backend's configuration (see appsettings.json and
+# docs/07-kubernetes.md "ConfigMaps"). Nested keys use the ASP.NET Core "__"
+# convention (e.g. AWS__BucketName binds to AWS:BucketName).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: hosting-platform
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  AWS__Region: "eu-central-1"
+  AWS__BucketName: "hosting-platform-prod-sites"
+  AWS__CloudFrontDistributionId: "REPLACE_WITH_CLOUDFRONT_DISTRIBUTION_ID"
+  AWS__CloudFrontDomain: "REPLACE_WITH_CLOUDFRONT_DOMAIN" # e.g. dxxxx.cloudfront.net
+  Authentication__CookieName: "HostingPlatform.Auth"
+  Authentication__ExpireDays: "7"
+---
+# The frontend uses same-origin relative "/api" calls routed by the ALB ingress,
+# so it needs no runtime API URL. (NEXT_PUBLIC_* values are baked at build time
+# by Next.js and cannot be injected at runtime.) This ConfigMap exists because the
+# frontend Deployment references it; keep it even if empty.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: hosting-platform
+data:
+  NODE_ENV: "production"

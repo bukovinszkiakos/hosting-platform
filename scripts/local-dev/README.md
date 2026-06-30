@@ -42,7 +42,7 @@ it is never committed:
 
 ```bash
 cd backend/src/HostingPlatform.Api
-dotnet user-secrets init   # only needed once; adds UserSecretsId to the .csproj
+# UserSecretsId is already set in the .csproj, so `dotnet user-secrets init` is not needed.
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
   "Host=localhost;Port=5432;Database=hostingplatform;Username=hostingplatform;Password=localdev"
 ```
@@ -56,3 +56,34 @@ cd backend
 dotnet tool restore        # restores the pinned dotnet-ef tool (first time only)
 dotnet ef database update --project src/HostingPlatform.Api/HostingPlatform.Api.csproj
 ```
+
+## Running the backend
+
+```bash
+# From backend/ — Development profile, Swagger UI at http://localhost:5165/swagger
+dotnet run --project src/HostingPlatform.Api
+```
+
+Roles (`User`, `Admin`) are seeded at startup, so the API needs the database to
+be running and migrated before it will start.
+
+## Running the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev   # http://localhost:3000
+```
+
+The Next dev server proxies `/api/*` to the backend (default
+`http://localhost:5165`, override with `BACKEND_ORIGIN`), so the browser only
+talks to `:3000` and no CORS setup is required. This mirrors production, where
+the ALB ingress routes `/api` to the backend.
+
+## What needs a real cluster
+
+Everything except the actual build runs locally. Starting a deployment enqueues
+it and the background worker drives the status lifecycle, but creating the build
+Kubernetes Job requires a real EKS cluster — so locally a deployment progresses
+`Pending -> Building -> Failed` (the in-cluster-config error is recorded on the
+deployment). This is expected outside a cluster.

@@ -282,14 +282,29 @@ Applied migrations should never be modified.
 
 ## Success
 
+Successful responses return the resource representation directly (an object or
+array) — there is no envelope:
+
 ```json id="xpr9z8"
 {
-  "message": "Success",
-  "data": {}
+  "id": "guid",
+  "name": "Portfolio Website",
+  "currentStatus": "Online"
+}
+```
+
+Action endpoints with no resource to return (register, login, logout, profile
+update, project delete) return a short acknowledgement:
+
+```json
+{
+  "message": "Login successful"
 }
 ```
 
 ## Error
+
+Every error response uses this shape (never RFC7807 ProblemDetails):
 
 ```json id="njx5yv"
 {
@@ -313,6 +328,15 @@ Validation errors should return:
   ]
 }
 ```
+
+This single shape covers both kinds of validation:
+
+* **Business validation** thrown as `ValidationException` and rendered by
+  `GlobalExceptionMiddleware`.
+* **Automatic model/binding validation** from `[ApiController]` (e.g. a missing
+  required field or malformed JSON), mapped to the same shape by a custom
+  `InvalidModelStateResponseFactory` (configured in `Program.cs`) instead of the
+  default RFC7807 ProblemDetails.
 
 ---
 
@@ -472,17 +496,28 @@ Examples:
 ```text id="4qj0v3"
 ConnectionStrings__DefaultConnection
 Authentication__CookieName
+Authentication__ExpireDays
 AWS__Region
 AWS__BucketName
 AWS__CloudFrontDistributionId
+AWS__CloudFrontDomain
 ```
+
+Locally, `ConnectionStrings__DefaultConnection` comes from `dotnet user-secrets`;
+in the cluster the AWS values come from a ConfigMap and the connection string from
+a Secret (see `k8s/base/configmap.example.yaml` and `k8s/secrets/secret.example.yaml`).
 
 ## Frontend
 
-Examples:
+The frontend calls the API at the **same origin** using relative `/api` paths, so
+no public API URL is configured. In production the ALB ingress routes `/api` to
+the backend; in local development the Next dev server proxies `/api` to the
+backend (`BACKEND_ORIGIN`, default `http://localhost:5165`; see
+`frontend/next.config.ts`). This same-origin model is what allows the session
+cookie to flow without any CORS configuration on the backend.
 
 ```text id="gc4f9d"
-NEXT_PUBLIC_API_URL
+BACKEND_ORIGIN   # local dev only: Next.js /api proxy target
 ```
 
 ---

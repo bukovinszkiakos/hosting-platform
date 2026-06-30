@@ -5,6 +5,7 @@ using HostingPlatform.Api.Extensions;
 using HostingPlatform.Api.Middleware;
 using HostingPlatform.Api.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -81,6 +82,31 @@ builder.Services.AddCloudFrontClient();
 builder.Services.AddScoped<ICloudFrontService, CloudFrontService>();
 
 builder.Services.AddControllers();
+
+// Make automatic model validation / binding 400s return the documented
+// { message, errors[] } shape instead of the default RFC7807 ProblemDetails, so
+// the error contract is identical to ValidationException (see GlobalExceptionMiddleware
+// and docs/08-api.md, docs/12 "Validation Errors").
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .SelectMany(entry => entry.Value!.Errors)
+            .Select(error => string.IsNullOrWhiteSpace(error.ErrorMessage)
+                ? "The request is invalid."
+                : error.ErrorMessage)
+            .Distinct()
+            .ToArray();
+
+        return new BadRequestObjectResult(new { message = "Validation failed", errors });
+    };
+
+    // Don't wrap other framework client errors (e.g. 415 Unsupported Media Type)
+    // in ProblemDetails either; keep responses free of the RFC7807 shape.
+    options.SuppressMapClientErrors = true;
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
