@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { FolderGit2, Rocket } from "lucide-react";
+import { FolderGit2, Rocket, Shield } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
 import { api, ApiError, type Profile } from "@/services/api";
+import { cn, initials } from "@/lib/utils";
 
 export default function ProfilePage() {
   return (
@@ -48,8 +53,6 @@ function ProfileView() {
     return () => controller.abort();
   }, []);
 
-  // After an update, reload the profile and refresh the cached user (an email or
-  // display-name change affects the session identity shown elsewhere).
   async function handleUpdated() {
     try {
       const data = await api.profile.get();
@@ -67,25 +70,35 @@ function ProfileView() {
   return (
     <AppShell isAdmin={user?.role === "Admin"}>
       <div className="mx-auto w-full max-w-3xl">
-        <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Your account information and settings.
-        </p>
+        <PageHeader
+          title="Profile"
+          description="Your account information and settings."
+        />
 
-        <div className="mt-6">
+        <div className="mt-8">
           {loading ? (
             <ProfileSkeleton />
           ) : error ? (
-            <div
-              role="alert"
-              className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
-            >
+            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
               {error}
-            </div>
+            </Card>
           ) : profile ? (
             <div className="flex flex-col gap-6">
               <ProfileInformation profile={profile} />
-              <ProfileStatistics profile={profile} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <StatCard
+                  label="Projects"
+                  value={profile.projectsCount}
+                  icon={FolderGit2}
+                  accent="bg-primary/10 text-primary"
+                />
+                <StatCard
+                  label="Deployments"
+                  value={profile.deploymentsCount}
+                  icon={Rocket}
+                  accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                />
+              </div>
               <EditProfileForm
                 key={`${profile.displayName}|${profile.email}`}
                 initialDisplayName={profile.displayName}
@@ -101,37 +114,39 @@ function ProfileView() {
 }
 
 function ProfileInformation({ profile }: { profile: Profile }) {
+  const isAdmin = profile.role === "Admin";
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
-      <h2 className="text-base font-semibold">Account information</h2>
-      <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-        <Field label="Display Name">{profile.displayName}</Field>
+    <Card className="p-6">
+      <div className="flex items-center gap-4">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-semibold text-primary">
+          {initials(profile.displayName)}
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-xl font-semibold tracking-tight">
+            {profile.displayName}
+          </h2>
+          <p className="truncate text-sm text-muted-foreground">{profile.email}</p>
+          <span
+            className={cn(
+              "mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+              isAdmin
+                ? "border-primary/25 bg-primary/10 text-primary"
+                : "border-border bg-muted text-muted-foreground",
+            )}
+          >
+            {isAdmin && <Shield className="size-3" />}
+            {profile.role}
+          </span>
+        </div>
+      </div>
+
+      <dl className="mt-6 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
+        <Field label="Display name">{profile.displayName}</Field>
         <Field label="Email">{profile.email}</Field>
         <Field label="Role">{profile.role}</Field>
-        <Field label="Created At">{formatDate(profile.createdAt)}</Field>
+        <Field label="Member since">{formatDate(profile.createdAt)}</Field>
       </dl>
-    </div>
-  );
-}
-
-function ProfileStatistics({ profile }: { profile: Profile }) {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Projects</span>
-          <FolderGit2 className="size-4 text-muted-foreground" />
-        </div>
-        <p className="mt-2 text-3xl font-semibold">{profile.projectsCount}</p>
-      </div>
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Deployments</span>
-          <Rocket className="size-4 text-muted-foreground" />
-        </div>
-        <p className="mt-2 text-3xl font-semibold">{profile.deploymentsCount}</p>
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -183,64 +198,70 @@ function EditProfileForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6"
-      noValidate
-    >
-      <h2 className="text-base font-semibold">Edit profile</h2>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="displayName">Display name</Label>
-        <Input
-          id="displayName"
-          type="text"
-          autoComplete="name"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          aria-invalid={error !== null}
-          disabled={submitting}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          aria-invalid={error !== null}
-          disabled={submitting}
-        />
-      </div>
-
-      {error && (
-        <div role="alert" className="text-sm text-destructive">
-          <p>{error}</p>
-          {details.length > 0 && (
-            <ul className="mt-1 list-inside list-disc">
-              {details.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          )}
+    <Card className="p-6">
+      <h2 className="font-semibold">Edit profile</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Update your display name and email address.
+      </p>
+      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4" noValidate>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="displayName">Display name</Label>
+          <Input
+            id="displayName"
+            type="text"
+            autoComplete="name"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            aria-invalid={error !== null}
+            disabled={submitting}
+          />
         </div>
-      )}
 
-      {success && (
-        <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">
-          {success}
-        </p>
-      )}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            aria-invalid={error !== null}
+            disabled={submitting}
+          />
+        </div>
 
-      <div>
-        <Button type="submit" disabled={submitting}>
-          {submitting ? "Saving…" : "Save changes"}
-        </Button>
-      </div>
-    </form>
+        {error && (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          >
+            <p>{error}</p>
+            {details.length > 0 && (
+              <ul className="mt-1 list-inside list-disc">
+                {details.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {success && (
+          <p
+            role="status"
+            className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400"
+          >
+            {success}
+          </p>
+        )}
+
+        <div>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -252,9 +273,9 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
+    <div className="bg-card p-4">
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm break-words">{children}</dd>
+      <dd className="mt-1.5 text-sm break-words">{children}</dd>
     </div>
   );
 }
@@ -262,24 +283,26 @@ function Field({
 function ProfileSkeleton() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="h-5 w-40 animate-pulse rounded bg-muted" />
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <Card className="p-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="size-16 rounded-2xl" />
+          <div>
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="mt-2 h-4 w-52" />
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index}>
-              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
-              <div className="mt-2 h-4 w-40 animate-pulse rounded bg-muted" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="mt-2 h-4 w-40" />
             </div>
           ))}
         </div>
-      </div>
+      </Card>
       <div className="grid gap-4 sm:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, index) => (
-          <div key={index} className="rounded-xl border border-border bg-card p-5">
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-            <div className="mt-3 h-8 w-12 animate-pulse rounded bg-muted" />
-          </div>
-        ))}
+        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-xl" />
       </div>
     </div>
   );

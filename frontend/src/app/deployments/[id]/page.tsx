@@ -3,18 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Rocket, Terminal, TriangleAlert } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  api,
-  ApiError,
-  type Deployment,
-  type DeploymentLog,
-} from "@/services/api";
+import { api, ApiError, type Deployment, type DeploymentLog } from "@/services/api";
 
 export default function DeploymentDetailsPage() {
   return (
@@ -67,7 +64,7 @@ function DeploymentDetailsView() {
       <div className="mx-auto w-full max-w-5xl">
         <Link
           href="/projects"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Back to projects
@@ -77,12 +74,9 @@ function DeploymentDetailsView() {
           {loading ? (
             <DeploymentDetailsSkeleton />
           ) : error ? (
-            <div
-              role="alert"
-              className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
-            >
+            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
               {error}
-            </div>
+            </Card>
           ) : deployment ? (
             <div className="flex flex-col gap-6">
               <DeploymentInformation deployment={deployment} />
@@ -100,23 +94,42 @@ function DeploymentDetailsView() {
 
 function DeploymentInformation({ deployment }: { deployment: Deployment }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
-      <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-semibold">Deployment</h1>
-        <StatusBadge status={deployment.status} />
+    <Card className="p-6">
+      <div className="flex items-start gap-3.5">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Rocket className="size-5.5" />
+        </span>
+        <div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl font-semibold tracking-tight">Deployment</h1>
+            <StatusBadge status={deployment.status} />
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Started {formatDateTime(deployment.startedAt)}
+          </p>
+        </div>
       </div>
 
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Field label="Status">{deployment.status}</Field>
-        <Field label="Started At">{formatDateTime(deployment.startedAt)}</Field>
-        <Field label="Finished At">
+      <dl className="mt-6 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
+        <Field label="Status">
+          <StatusBadge status={deployment.status} />
+        </Field>
+        <Field label="Duration">
+          {deployment.finishedAt ? (
+            duration(deployment.startedAt, deployment.finishedAt)
+          ) : (
+            <span className="text-muted-foreground">In progress</span>
+          )}
+        </Field>
+        <Field label="Started at">{formatDateTime(deployment.startedAt)}</Field>
+        <Field label="Finished at">
           {deployment.finishedAt ? (
             formatDateTime(deployment.finishedAt)
           ) : (
             <span className="text-muted-foreground">In progress</span>
           )}
         </Field>
-        <Field label="Build Summary">
+        <Field label="Build summary" full>
           {deployment.buildSummary ? (
             deployment.buildSummary
           ) : (
@@ -124,45 +137,58 @@ function DeploymentInformation({ deployment }: { deployment: Deployment }) {
           )}
         </Field>
       </dl>
-    </div>
+    </Card>
   );
 }
 
 function ErrorInformation({ message }: { message: string }) {
   return (
-    <div
-      role="alert"
-      className="rounded-xl border border-destructive/30 bg-destructive/5 p-5"
-    >
-      <h2 className="text-sm font-semibold text-destructive">Build failed</h2>
-      <p className="mt-1 text-sm text-destructive">{message}</p>
-    </div>
+    <Card className="border-destructive/30 bg-destructive/5 p-5" role="alert">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-destructive">
+        <TriangleAlert className="size-4" />
+        Build failed
+      </h2>
+      <p className="mt-2 text-sm text-destructive/90">{message}</p>
+    </Card>
   );
 }
 
 function BuildLogs({ logs }: { logs: DeploymentLog[] }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold">Build Logs</h2>
+      <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <Terminal className="size-4.5 text-muted-foreground" />
+        Build logs
+      </h2>
 
       {logs.length === 0 ? (
-        <div className="mt-3 rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+        <Card className="mt-3 border-dashed p-10 text-center text-sm text-muted-foreground shadow-none">
           No build logs available.
-        </div>
+        </Card>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-muted/40 p-4">
-          <pre className="font-mono text-xs leading-relaxed">
-            {logs.map((log, index) => (
-              <div key={index} className="flex gap-3">
-                <span className="shrink-0 text-muted-foreground">
-                  {formatLogTime(log.createdAt)}
-                </span>
-                <span className="whitespace-pre-wrap break-words">
-                  {log.message}
-                </span>
-              </div>
-            ))}
-          </pre>
+        <div className="mt-3 overflow-hidden rounded-xl border border-border bg-foreground/[0.97] shadow-sm">
+          <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-2.5">
+            <span className="size-2.5 rounded-full bg-red-400/80" />
+            <span className="size-2.5 rounded-full bg-amber-400/80" />
+            <span className="size-2.5 rounded-full bg-emerald-400/80" />
+            <span className="ml-2 text-xs font-medium text-white/50">
+              build output
+            </span>
+          </div>
+          <div className="overflow-x-auto p-4">
+            <pre className="font-mono text-xs leading-relaxed text-white/85">
+              {logs.map((log, index) => (
+                <div key={index} className="flex gap-3">
+                  <span className="shrink-0 text-white/35 select-none tabular-nums">
+                    {formatLogTime(log.createdAt)}
+                  </span>
+                  <span className="whitespace-pre-wrap break-words">
+                    {log.message}
+                  </span>
+                </div>
+              ))}
+            </pre>
+          </div>
         </div>
       )}
     </div>
@@ -171,15 +197,17 @@ function BuildLogs({ logs }: { logs: DeploymentLog[] }) {
 
 function Field({
   label,
+  full = false,
   children,
 }: {
   label: string;
+  full?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div>
+    <div className={full ? "bg-card p-4 sm:col-span-2" : "bg-card p-4"}>
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm break-words">{children}</dd>
+      <dd className="mt-1.5 text-sm break-words">{children}</dd>
     </div>
   );
 }
@@ -187,18 +215,22 @@ function Field({
 function DeploymentDetailsSkeleton() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="h-7 w-40 animate-pulse rounded bg-muted" />
+      <Card className="p-6">
+        <div className="flex items-center gap-3.5">
+          <Skeleton className="size-11 rounded-xl" />
+          <Skeleton className="h-7 w-40" />
+        </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index}>
-              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
-              <div className="mt-2 h-4 w-40 animate-pulse rounded bg-muted" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="mt-2 h-4 w-40" />
             </div>
           ))}
         </div>
-      </div>
-      <div className="h-5 w-32 animate-pulse rounded bg-muted" />
+      </Card>
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-24 w-full rounded-xl" />
     </div>
   );
 }
@@ -227,4 +259,13 @@ function formatLogTime(value: string) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function duration(start: string, end: string) {
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (Number.isNaN(ms) || ms < 0) return "—";
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${seconds % 60}s`;
 }

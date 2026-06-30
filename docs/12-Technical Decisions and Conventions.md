@@ -471,19 +471,39 @@ Protected pages should verify authentication before rendering.
 
 ## Styling
 
-* Tailwind CSS
-* shadcn/ui
+* Tailwind CSS v4 (CSS-first config in `app/globals.css`)
+* shadcn/ui-style primitives + `@base-ui/react`
+* `tw-animate-css` for subtle entrance/micro-interaction utilities
 
 ## Icons
 
 * Lucide Icons
 
+## Design System
+
+The frontend follows one consistent visual language defined by design tokens in
+`app/globals.css` and a small set of shared primitives.
+
+* **Brand colour**: an indigo/violet `--primary` (and `--ring`), used for primary
+  buttons, links, focus rings, active navigation and accents.
+* **Typography**: Geist Sans (`--font-sans`) for UI, Geist Mono for logs/code.
+* **Surfaces**: tokenised neutrals with a faint cool tint; cards use `--card`,
+  rounded corners (`--radius` = 0.7rem), thin borders and soft layered shadows.
+* **Shared UI primitives** (`components/ui/`): `Button`, `Input`, `Label`,
+  `Card` (with optional `interactive` hover-lift), `StatusBadge` (colour-coded with
+  a pulsing dot for in-progress statuses), `StatCard`, `PageHeader`, `Skeleton`.
+* **Layout** (`components/layout/`): `AppShell` = `Sidebar` + `TopNav` + content;
+  navigation items come from a single `nav-items` source.
+* **Motion**: tasteful and subtle — hover elevation on interactive cards, button
+  press feedback, an animated status dot, content fade-in, and skeleton loaders.
+  Animations are kept minimal and premium, never distracting.
+
 ## Design Goals
 
-* Clean SaaS interface
-* Responsive design
-* Modern dashboard layout
-* Consistent spacing and typography
+* Premium, modern SaaS experience
+* Responsive across desktop, tablet and mobile
+* Clear visual hierarchy and consistent spacing/typography
+* Accessible: good contrast, visible focus states, keyboard-navigable
 
 ---
 

@@ -2,14 +2,17 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { FolderGit2, Plus } from "lucide-react";
+import { ExternalLink, FolderGit2, GitBranch, Plus } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api, ApiError, type Project } from "@/services/api";
 
@@ -63,21 +66,18 @@ function ProjectsView() {
 
   return (
     <AppShell isAdmin={user?.role === "Admin"}>
-      <div className="mx-auto w-full max-w-5xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">Projects</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage the websites you deploy from GitHub.
-            </p>
-          </div>
+      <div className="mx-auto w-full max-w-6xl">
+        <PageHeader
+          title="Projects"
+          description="Manage the websites you deploy from GitHub."
+        >
           {!loading && !error && (
             <Button onClick={() => setCreating((value) => !value)}>
               <Plus />
               New project
             </Button>
           )}
-        </div>
+        </PageHeader>
 
         {creating && (
           <div className="mt-6">
@@ -92,12 +92,9 @@ function ProjectsView() {
           {loading ? (
             <ProjectListSkeleton />
           ) : error ? (
-            <div
-              role="alert"
-              className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
-            >
+            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
               {error}
-            </div>
+            </Card>
           ) : projects && projects.length > 0 ? (
             <ul className="flex flex-col gap-3">
               {projects.map((project) => (
@@ -154,59 +151,61 @@ function CreateProjectForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5"
-      noValidate
-    >
+    <Card className="p-6 duration-300 animate-in fade-in slide-in-from-top-2">
       <h2 className="text-base font-semibold">New project</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Connect a public GitHub repository to deploy.
+      </p>
+      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4" noValidate>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="name">Project name</Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="My Website"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-invalid={error !== null}
+              disabled={submitting}
+            />
+          </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="name">Project name</Label>
-        <Input
-          id="name"
-          type="text"
-          placeholder="My Website"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-invalid={error !== null}
-          disabled={submitting}
-        />
-      </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="repositoryUrl">Repository URL</Label>
+            <Input
+              id="repositoryUrl"
+              type="url"
+              placeholder="https://github.com/user/repo"
+              value={repositoryUrl}
+              onChange={(e) => setRepositoryUrl(e.target.value)}
+              aria-invalid={error !== null}
+              disabled={submitting}
+            />
+          </div>
+        </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="repositoryUrl">Repository URL</Label>
-        <Input
-          id="repositoryUrl"
-          type="url"
-          placeholder="https://github.com/user/repo"
-          value={repositoryUrl}
-          onChange={(e) => setRepositoryUrl(e.target.value)}
-          aria-invalid={error !== null}
-          disabled={submitting}
-        />
-      </div>
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
-      <div className="flex gap-2">
-        <Button type="submit" disabled={submitting}>
-          {submitting ? "Creating…" : "Create project"}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onCancel}
-          disabled={submitting}
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Creating…" : "Create project"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -239,44 +238,52 @@ function ProjectCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <Card className="p-5 transition-colors hover:border-primary/30">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <FolderGit2 className="size-4 shrink-0 text-muted-foreground" />
-            <Link
-              href={`/projects/${project.id}`}
-              className="truncate text-base font-semibold hover:underline"
-            >
-              {project.name}
-            </Link>
-            <StatusBadge status={project.currentStatus} />
+        <div className="flex min-w-0 gap-3.5">
+          <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <FolderGit2 className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/projects/${project.id}`}
+                className="truncate font-semibold hover:text-primary hover:underline"
+              >
+                {project.name}
+              </Link>
+              <StatusBadge status={project.currentStatus} />
+            </div>
+
+            <p className="mt-1.5 flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+              <GitBranch className="size-3.5 shrink-0" />
+              {project.repositoryUrl || "No repository URL"}
+            </p>
+
+            {project.websiteUrl && (
+              <a
+                href={project.websiteUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-flex items-center gap-1 truncate text-sm font-medium text-primary hover:underline"
+              >
+                {project.websiteUrl}
+                <ExternalLink className="size-3.5 shrink-0" />
+              </a>
+            )}
+
+            <p className="mt-2 text-xs text-muted-foreground">
+              Updated {formatDate(project.updatedAt)}
+            </p>
           </div>
-
-          <p className="mt-2 truncate text-sm text-muted-foreground">
-            {project.repositoryUrl || "No repository URL"}
-          </p>
-
-          {project.websiteUrl && (
-            <a
-              href={project.websiteUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-block truncate text-sm font-medium text-primary hover:underline"
-            >
-              {project.websiteUrl}
-            </a>
-          )}
-
-          <p className="mt-2 text-xs text-muted-foreground">
-            Updated {formatDate(project.updatedAt)}
-          </p>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {confirming ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Delete?</span>
+            <>
+              <span className="hidden text-sm text-muted-foreground sm:inline">
+                Delete?
+              </span>
               <Button
                 variant="destructive"
                 size="sm"
@@ -293,15 +300,23 @@ function ProjectCard({
               >
                 Cancel
               </Button>
-            </div>
+            </>
           ) : (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setConfirming(true)}
-            >
-              Delete
-            </Button>
+            <>
+              <Link
+                href={`/projects/${project.id}`}
+                className={buttonLinkClass}
+              >
+                Open
+              </Link>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setConfirming(true)}
+              >
+                Delete
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -311,25 +326,31 @@ function ProjectCard({
           {error}
         </p>
       )}
-    </div>
+    </Card>
   );
 }
 
+// A link styled like a small outline button (Link can't use the Button primitive).
+const buttonLinkClass =
+  "inline-flex h-8 items-center rounded-[min(var(--radius-md),12px)] border border-border bg-background px-3 text-[0.8rem] font-medium shadow-xs transition-colors hover:bg-muted";
+
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
-      <FolderGit2 className="size-8 text-muted-foreground" />
+    <Card className="flex flex-col items-center gap-3 border-dashed p-12 text-center shadow-none">
+      <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <FolderGit2 className="size-6" />
+      </span>
       <div>
         <p className="text-base font-semibold">No projects yet</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Create your first project to deploy a website from GitHub.
         </p>
       </div>
-      <Button onClick={onCreate}>
+      <Button onClick={onCreate} className="mt-1">
         <Plus />
         New project
       </Button>
-    </div>
+    </Card>
   );
 }
 
@@ -337,11 +358,14 @@ function ProjectListSkeleton() {
   return (
     <div className="flex flex-col gap-3">
       {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className="rounded-xl border border-border bg-card p-5">
-          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
-          <div className="mt-3 h-4 w-64 animate-pulse rounded bg-muted" />
-          <div className="mt-2 h-3 w-24 animate-pulse rounded bg-muted" />
-        </div>
+        <Card key={index} className="flex items-start gap-3.5 p-5">
+          <Skeleton className="size-10 rounded-lg" />
+          <div className="flex-1">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="mt-3 h-4 w-64" />
+            <Skeleton className="mt-2 h-3 w-24" />
+          </div>
+        </Card>
       ))}
     </div>
   );

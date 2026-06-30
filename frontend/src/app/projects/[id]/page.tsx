@@ -3,21 +3,18 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ExternalLink, Pencil, Rocket } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, Pencil, Rocket } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  api,
-  ApiError,
-  type Deployment,
-  type Project,
-} from "@/services/api";
+import { api, ApiError, type Deployment, type Project } from "@/services/api";
 
 export default function ProjectDetailsPage() {
   return (
@@ -40,8 +37,6 @@ function ProjectDetailsView() {
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
 
-  // Loads the project and its deployment history together. Returns a no-op
-  // cleanup so callers outside an effect can ignore it.
   const load = useCallback(
     (signal?: AbortSignal) => {
       setLoading(true);
@@ -81,7 +76,6 @@ function ProjectDetailsView() {
     setDeploying(true);
     try {
       await api.projects.deploy(id);
-      // A new deployment changes both the history and the project status.
       await load();
     } catch (err) {
       setDeployError(
@@ -99,7 +93,7 @@ function ProjectDetailsView() {
       <div className="mx-auto w-full max-w-5xl">
         <Link
           href="/projects"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Back to projects
@@ -109,12 +103,9 @@ function ProjectDetailsView() {
           {loading ? (
             <ProjectDetailsSkeleton />
           ) : error ? (
-            <div
-              role="alert"
-              className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
-            >
+            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
               {error}
-            </div>
+            </Card>
           ) : project ? (
             <div className="flex flex-col gap-6">
               <ProjectInformation
@@ -149,12 +140,22 @@ function ProjectInformation({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <Card className="p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-2xl font-semibold">{project.name}</h1>
-            <StatusBadge status={project.currentStatus} />
+        <div className="flex min-w-0 gap-3.5">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Rocket className="size-5.5" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="truncate text-2xl font-semibold tracking-tight">
+                {project.name}
+              </h1>
+              <StatusBadge status={project.currentStatus} />
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Created {formatDate(project.createdAt)}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -183,8 +184,8 @@ function ProjectInformation({
           }}
         />
       ) : (
-        <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Field label="Repository URL">
+        <dl className="mt-6 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
+          <Field label="Repository URL" icon={<GitBranch className="size-3.5" />}>
             {project.repositoryUrl ? (
               <span className="break-all">{project.repositoryUrl}</span>
             ) : (
@@ -206,8 +207,10 @@ function ProjectInformation({
               <span className="text-muted-foreground">Not published yet</span>
             )}
           </Field>
-          <Field label="Current Status">{project.currentStatus}</Field>
-          <Field label="Last Updated">{formatDateTime(project.updatedAt)}</Field>
+          <Field label="Current status">
+            <StatusBadge status={project.currentStatus} />
+          </Field>
+          <Field label="Last updated">{formatDate(project.updatedAt)}</Field>
         </dl>
       )}
 
@@ -216,7 +219,7 @@ function ProjectInformation({
           {deployError}
         </p>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -261,7 +264,11 @@ function EditProjectForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4" noValidate>
+    <form
+      onSubmit={handleSubmit}
+      className="mt-6 flex flex-col gap-4 rounded-xl border border-border bg-muted/30 p-5 duration-300 animate-in fade-in"
+      noValidate
+    >
       <div className="flex flex-col gap-2">
         <Label htmlFor="edit-name">Project name</Label>
         <Input
@@ -312,46 +319,45 @@ function EditProjectForm({
 function DeploymentHistory({ deployments }: { deployments: Deployment[] }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold">Deployment History</h2>
+      <h2 className="text-lg font-semibold tracking-tight">Deployment history</h2>
 
       {deployments.length === 0 ? (
-        <div className="mt-3 rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          No deployments yet. Use Deploy to publish this project.
-        </div>
+        <Card className="mt-3 border-dashed p-10 text-center text-sm text-muted-foreground shadow-none">
+          No deployments yet. Use <span className="font-medium text-foreground">Deploy</span> to publish this project.
+        </Card>
       ) : (
         <ul className="mt-3 flex flex-col gap-3">
           {deployments.map((deployment, index) => (
             <li key={deployment.id}>
-              <Link
-                href={`/deployments/${deployment.id}`}
-                className="block rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/50"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    {/* Newest first, so the oldest deployment is #1. */}
-                    <span className="text-sm font-semibold">
-                      Deploy #{deployments.length - index}
-                    </span>
-                    <StatusBadge status={deployment.status} />
+              <Link href={`/deployments/${deployment.id}`} className="block">
+                <Card interactive className="p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      {/* Newest first, so the oldest deployment is #1. */}
+                      <span className="text-sm font-semibold">
+                        Deploy #{deployments.length - index}
+                      </span>
+                      <StatusBadge status={deployment.status} />
+                    </div>
+                    <div className="text-xs text-muted-foreground tabular-nums">
+                      {formatDateTime(deployment.startedAt)}
+                      {deployment.finishedAt
+                        ? ` — ${formatDateTime(deployment.finishedAt)}`
+                        : ""}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatDateTime(deployment.startedAt)}
-                    {deployment.finishedAt
-                      ? ` — ${formatDateTime(deployment.finishedAt)}`
-                      : ""}
-                  </div>
-                </div>
 
-                {deployment.buildSummary && (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {deployment.buildSummary}
-                  </p>
-                )}
-                {deployment.errorMessage && (
-                  <p className="mt-2 text-sm text-destructive">
-                    {deployment.errorMessage}
-                  </p>
-                )}
+                  {deployment.buildSummary && (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {deployment.buildSummary}
+                    </p>
+                  )}
+                  {deployment.errorMessage && (
+                    <p className="mt-2 line-clamp-2 text-sm text-destructive">
+                      {deployment.errorMessage}
+                    </p>
+                  )}
+                </Card>
               </Link>
             </li>
           ))}
@@ -363,15 +369,20 @@ function DeploymentHistory({ deployments }: { deployments: Deployment[] }) {
 
 function Field({
   label,
+  icon,
   children,
 }: {
   label: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm">{children}</dd>
+    <div className="bg-card p-4">
+      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        {icon}
+        {label}
+      </dt>
+      <dd className="mt-1.5 text-sm break-words">{children}</dd>
     </div>
   );
 }
@@ -379,20 +390,36 @@ function Field({
 function ProjectDetailsSkeleton() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="h-7 w-48 animate-pulse rounded bg-muted" />
+      <Card className="p-6">
+        <div className="flex items-center gap-3.5">
+          <Skeleton className="size-11 rounded-xl" />
+          <Skeleton className="h-7 w-48" />
+        </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index}>
-              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
-              <div className="mt-2 h-4 w-40 animate-pulse rounded bg-muted" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="mt-2 h-4 w-40" />
             </div>
           ))}
         </div>
-      </div>
-      <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+      </Card>
+      <Skeleton className="h-5 w-40" />
+      <Skeleton className="h-20 w-full rounded-xl" />
     </div>
   );
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "unknown";
+  }
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function formatDateTime(value: string) {

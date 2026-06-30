@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 
@@ -22,8 +23,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   // user, do not render the protected content.
   if (loading || user === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading…
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }

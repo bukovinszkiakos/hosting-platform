@@ -9,9 +9,6 @@ only when it has actually been implemented.
 
 ## Open items
 
-- **Final visual polish.** Ongoing: spacing, empty states, and responsive details
-  across pages (the Task 65 pass covered navigation, logout, status colours and
-  mobile nav; remaining tweaks are incremental).
 - **Additional confirmation dialogs where appropriate.** e.g. a modal confirmation
   for destructive actions. Project delete currently uses a lightweight inline
   confirm, which is adequate for the MVP.
@@ -44,3 +41,8 @@ only when it has actually been implemented.
 - **Mobile navigation.** (Task 65) The sidebar is hidden on small screens, so the
   top bar now provides a menu (navigation items + log out) — the app is navigable
   on mobile.
+- **Premium UI/UX redesign.** (Task 65 — final pass) A full design-system pass: a
+  brand colour palette and design tokens, Geist typography, shared primitives
+  (`Card`, `StatCard`, `PageHeader`, `Skeleton`, richer `StatusBadge`), a redesigned
+  landing/auth/dashboard/projects/deployments/profile/admin, brand navigation with
+  avatars, and subtle motion. See docs/12 "Design System".

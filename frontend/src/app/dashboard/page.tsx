@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState } from "react";
 import { CircleCheck, CircleX, FolderGit2, Rocket } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
 import { api, ApiError, type DashboardSummary } from "@/services/api";
 
 export default function DashboardPage() {
@@ -47,28 +51,45 @@ function DashboardView() {
 
   return (
     <AppShell isAdmin={user?.role === "Admin"}>
-      <div className="mx-auto w-full max-w-5xl">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          An overview of your projects and deployments.
-        </p>
+      <div className="mx-auto w-full max-w-6xl">
+        <PageHeader
+          title="Dashboard"
+          description="An overview of your projects and deployments."
+        />
 
-        <div className="mt-6">
+        <div className="mt-8">
           {loading ? (
             <StatGridSkeleton />
           ) : error ? (
-            <div
-              role="alert"
-              className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
-            >
+            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
               {error}
-            </div>
+            </Card>
           ) : data ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Projects" value={data.projectsCount} icon={FolderGit2} />
-              <StatCard label="Deployments" value={data.deploymentsCount} icon={Rocket} />
-              <StatCard label="Online Projects" value={data.onlineProjects} icon={CircleCheck} />
-              <StatCard label="Failed Projects" value={data.failedProjects} icon={CircleX} />
+              <StatCard
+                label="Projects"
+                value={data.projectsCount}
+                icon={FolderGit2}
+                accent="bg-primary/10 text-primary"
+              />
+              <StatCard
+                label="Deployments"
+                value={data.deploymentsCount}
+                icon={Rocket}
+                accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              />
+              <StatCard
+                label="Online Projects"
+                value={data.onlineProjects}
+                icon={CircleCheck}
+                accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              />
+              <StatCard
+                label="Failed Projects"
+                value={data.failedProjects}
+                icon={CircleX}
+                accent="bg-destructive/10 text-destructive"
+              />
             </div>
           ) : null}
         </div>
@@ -77,34 +98,17 @@ function DashboardView() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  icon: ComponentType<{ className?: string }>;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">{label}</span>
-        <Icon className="size-4 text-muted-foreground" />
-      </div>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
 function StatGridSkeleton() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="rounded-xl border border-border bg-card p-5">
-          <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-          <div className="mt-3 h-8 w-12 animate-pulse rounded bg-muted" />
-        </div>
+        <Card key={index} className="p-5">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="size-9 rounded-lg" />
+          </div>
+          <Skeleton className="mt-3 h-8 w-12" />
+        </Card>
       ))}
     </div>
   );
