@@ -1,40 +1,30 @@
 "use client";
 
-import type { ComponentType } from "react";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import {
-  FolderGit2,
-  House,
-  LayoutDashboard,
-  Rocket,
-  Shield,
-  User,
-} from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { LogOut, Rocket } from "lucide-react";
 
+import { useAuth } from "@/components/auth/auth-provider";
+import { navItemsForRole } from "@/components/layout/nav-items";
 import { cn } from "@/lib/utils";
-
-type NavItem = {
-  href: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-};
-
-// Regular-user navigation (see docs/09-frontend-pages.md "Navigation").
-const navItems: NavItem[] = [
-  { href: "/home", label: "Home", icon: House },
-  { href: "/projects", label: "Projects", icon: FolderGit2 },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/profile", label: "Profile", icon: User },
-];
-
-// Shown only to administrators.
-const adminNavItem: NavItem = { href: "/admin", label: "Admin", icon: Shield };
 
 export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
-  const items = isAdmin ? [...navItems, adminNavItem] : navItems;
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const items = navItemsForRole(isAdmin);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await logout();
+      router.replace("/login");
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
@@ -70,6 +60,24 @@ export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           );
         })}
       </nav>
+
+      <div className="border-t border-sidebar-border p-3">
+        {user && (
+          <div className="px-1 pb-2">
+            <p className="truncate text-sm font-medium">{user.displayName}</p>
+            <p className="truncate text-xs text-sidebar-foreground/60">{user.email}</p>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+        >
+          <LogOut className="size-4" />
+          {loggingOut ? "Signing out…" : "Log out"}
+        </button>
+      </div>
     </aside>
   );
 }

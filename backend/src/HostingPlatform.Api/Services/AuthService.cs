@@ -15,11 +15,16 @@ public class AuthService : IAuthService
 
     private readonly UserManager<User> _userManager;
     private readonly SignInManager<User> _signInManager;
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(UserManager<User> userManager, SignInManager<User> signInManager)
+    public AuthService(
+        UserManager<User> userManager,
+        SignInManager<User> signInManager,
+        ILogger<AuthService> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
+        _logger = logger;
     }
 
     public async Task RegisterAsync(RegisterRequest request)
@@ -46,6 +51,8 @@ public class AuthService : IAuthService
                 "Failed to assign default role: " +
                 string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
+
+        _logger.LogInformation("User registered: {UserId} ({Email})", user.Id, user.Email);
     }
 
     public async Task LoginAsync(LoginRequest request)
@@ -57,8 +64,13 @@ public class AuthService : IAuthService
 
         if (!result.Succeeded)
         {
+            // Security-relevant: a failed sign-in. The email is the login identifier,
+            // not a secret; the password is never logged.
+            _logger.LogWarning("Failed login attempt for {Email}", request.Email);
             throw new UnauthorizedException("Invalid email or password");
         }
+
+        _logger.LogInformation("User logged in: {Email}", request.Email);
     }
 
     public Task LogoutAsync() => _signInManager.SignOutAsync();
@@ -77,6 +89,6 @@ public class AuthService : IAuthService
             user.Id,
             user.DisplayName,
             user.Email ?? string.Empty,
-            roles.FirstOrDefault() ?? string.Empty);
+            RoleNames.Primary(roles));
     }
 }

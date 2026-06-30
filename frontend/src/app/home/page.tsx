@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { buttonVariants } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { api, ApiError, type Deployment, type Project } from "@/services/api";
 
@@ -228,23 +229,6 @@ function EmptyCard({ message }: { message: string }) {
     <div className="mt-3 rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
       {message}
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const tone =
-    status === "Online"
-      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-      : status === "Failed"
-        ? "border-destructive/30 bg-destructive/10 text-destructive"
-        : "border-border bg-muted text-muted-foreground";
-
-  return (
-    <span
-      className={cn("rounded-full border px-2 py-0.5 text-xs font-medium", tone)}
-    >
-      {status}
-    </span>
   );
 }
 

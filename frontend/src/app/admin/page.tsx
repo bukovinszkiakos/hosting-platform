@@ -6,6 +6,7 @@ import { FolderGit2, Rocket, ShieldX, Users } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import {
   api,
@@ -186,7 +187,7 @@ function ProjectsTable({ projects }: { projects: AdminProject[] }) {
                   <Td>{p.name}</Td>
                   <Td className="text-muted-foreground">{p.ownerEmail}</Td>
                   <Td>
-                    <StatusPill label={p.currentStatus} />
+                    <StatusBadge status={p.currentStatus} />
                   </Td>
                   <Td className="text-muted-foreground">{formatDate(p.createdAt)}</Td>
                 </tr>

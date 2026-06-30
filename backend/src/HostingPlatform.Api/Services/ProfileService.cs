@@ -37,7 +37,7 @@ public class ProfileService : IProfileService
         return new ProfileResponse(
             user.DisplayName,
             user.Email ?? string.Empty,
-            roles.FirstOrDefault() ?? string.Empty,
+            RoleNames.Primary(roles),
             user.CreatedAt,
             projectsCount,
             deploymentsCount);

@@ -10,11 +10,11 @@ terraform/
 ├── backend/                 # Remote state bootstrap: S3 bucket + DynamoDB lock table
 ├── modules/                 # Reusable modules
 │   ├── vpc/                 # VPC, public/private subnets, IGW, NAT, route tables
-│   ├── eks/                 # EKS cluster, managed node group, cluster/node IAM roles
+│   ├── eks/                 # EKS cluster, managed node group, cluster/node IAM roles, Pod Identity Agent addon
 │   ├── rds/                 # PostgreSQL, subnet group, security group
 │   ├── s3/                  # Static-site hosting bucket + public-read policy
-│   ├── cloudfront/          # CDN/HTTPS distribution in front of the bucket
-│   └── iam/                 # Backend service IAM role (S3 + CloudFront, least privilege)
+│   ├── cloudfront/          # CDN/HTTPS distribution + index.html rewrite function
+│   └── iam/                 # Backend service IAM role (S3 + CloudFront, least privilege) + Pod Identity association
 └── environments/
     ├── dev/                 # Cost-minimized development environment
     └── prod/                # Production-sized environment

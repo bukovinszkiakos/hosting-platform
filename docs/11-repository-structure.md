@@ -48,7 +48,11 @@ docs/
 ├── 08-api.md
 ├── 09-frontend-pages.md
 ├── 10-deployment-workflow.md
-└── 11-repository-structure.md
+├── 11-repository-structure.md
+├── 12-technical-decisions-and-conventions.md
+├── 13-implementation-task-sequence.md
+├── 14-post-mvp-polish.md
+└── 15-demo.md
 ```
 
 ---
@@ -137,8 +141,17 @@ Services/
 ├── DeploymentService
 ├── DashboardService
 ├── AdminService
-└── BuildService
+├── KubernetesJobService
+├── BuildJobSpecFactory
+├── DeploymentBuildWorker   # hosted background service (build orchestration)
+├── DeploymentQueue
+├── S3Service
+└── CloudFrontService
 ```
+
+> Each service has a matching `I…` interface. Small build-support types
+> (`BuildJobParameters`, `BuildJobState`, `BuildJobNaming`, `BuildJobEnvironment`,
+> `DeploymentStatus`) also live here.
 
 ---
 

@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
-import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   api,
   ApiError,
@@ -181,26 +181,6 @@ function Field({
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-sm break-words">{children}</dd>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const tone =
-    status === "Online"
-      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-      : status === "Failed"
-        ? "border-destructive/30 bg-destructive/10 text-destructive"
-        : "border-border bg-muted text-muted-foreground";
-
-  return (
-    <span
-      className={cn(
-        "rounded-full border px-2 py-0.5 text-xs font-medium",
-        tone,
-      )}
-    >
-      {status}
-    </span>
   );
 }
 

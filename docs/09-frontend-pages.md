@@ -70,7 +70,10 @@ The following pages are accessible without authentication:
 /
 ```
 
-The landing page introduces the platform.
+The landing page introduces the platform. It stays publicly viewable, but when
+the visitor already has a valid session the call-to-action becomes **Open app**
+(linking to `/home`) instead of Login / Get Started — no redirect, so security is
+unchanged.
 
 ---
 
@@ -503,6 +506,8 @@ Profile
 Admin
 ```
 
+A **Log out** action is always available from the layout (see Layout Structure).
+
 ---
 
 # Layout Structure
@@ -516,6 +521,14 @@ Sidebar
 Top Navigation
 Page Content
 ```
+
+* **Sidebar** (desktop, `md+`): brand, the navigation items above, and a footer
+  showing the signed-in user (name + email) with a **Log out** button.
+* **Top Navigation**: shows the signed-in user's name. On small screens (where the
+  sidebar is hidden) it also provides a menu button that opens the navigation
+  items and **Log out**, so the app is fully usable on mobile.
+
+Logging out clears the session cookie and returns to `/login`.
 
 ---
 

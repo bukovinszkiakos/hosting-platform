@@ -35,7 +35,7 @@ public class AdminService : IAdminService
                 user.Id,
                 user.DisplayName,
                 user.Email ?? string.Empty,
-                roles.FirstOrDefault() ?? string.Empty,
+                RoleNames.Primary(roles),
                 user.CreatedAt));
         }
 

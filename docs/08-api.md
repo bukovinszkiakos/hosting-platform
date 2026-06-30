@@ -126,6 +126,10 @@ GET /api/auth/me
 }
 ```
 
+`role` is the user's effective (highest-privilege) role. A user always has the
+`User` role and may additionally have `Admin`; an admin is reported as `Admin`.
+The same projection is used by `GET /api/profile` and `GET /api/admin/users`.
+
 ---
 
 # Profile API

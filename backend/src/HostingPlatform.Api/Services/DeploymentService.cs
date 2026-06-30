@@ -11,15 +11,18 @@ public class DeploymentService : IDeploymentService
     private readonly AppDbContext _context;
     private readonly IKubernetesJobService _kubernetesJobService;
     private readonly IDeploymentQueue _queue;
+    private readonly ILogger<DeploymentService> _logger;
 
     public DeploymentService(
         AppDbContext context,
         IKubernetesJobService kubernetesJobService,
-        IDeploymentQueue queue)
+        IDeploymentQueue queue,
+        ILogger<DeploymentService> logger)
     {
         _context = context;
         _kubernetesJobService = kubernetesJobService;
         _queue = queue;
+        _logger = logger;
     }
 
     public async Task<DeploymentResponse> CreateDeploymentAsync(Guid userId, Guid projectId)
@@ -56,6 +59,10 @@ public class DeploymentService : IDeploymentService
 
         // Hand the deployment to the background build worker (see DeploymentBuildWorker).
         _queue.Enqueue(deployment.Id);
+
+        _logger.LogInformation(
+            "Deployment {DeploymentId} created for project {ProjectId} and queued for build",
+            deployment.Id, project.Id);
 
         return ToResponse(deployment);
     }

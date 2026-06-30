@@ -67,6 +67,8 @@ public class ProjectService : IProjectService
         _context.Projects.Add(project);
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation("Project {ProjectId} created for user {UserId}", project.Id, userId);
+
         return ToResponse(project);
     }
 
@@ -110,6 +112,8 @@ public class ProjectService : IProjectService
 
         _context.Projects.Remove(project);
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Project {ProjectId} deleted for user {UserId}", projectId, userId);
     }
 
     // Loads a project the user owns, or throws NotFound. Not-owned projects are

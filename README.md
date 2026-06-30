@@ -9,6 +9,9 @@ specification (the `docs` directory is the source of truth).
 - Frontend: Next.js 15 (App Router), TypeScript, Tailwind, shadcn/ui
 - Infrastructure: Terraform, AWS (EKS, RDS, S3, CloudFront), Kubernetes
 
+To run a guided demo (local walkthrough + full AWS demo steps), see
+[`docs/15-demo.md`](docs/15-demo.md).
+
 ## Prerequisites
 
 - .NET 8 SDK

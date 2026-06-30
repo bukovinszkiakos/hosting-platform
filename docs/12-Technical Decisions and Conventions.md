@@ -650,6 +650,19 @@ Instance: db.t3.micro
 
 ## Application Logs
 
+`ILogger<T>` with structured message templates (named placeholders, never string
+interpolation). Application logs cover the key security and lifecycle events:
+
+* Authentication: user registered (Information), login success (Information),
+  failed login attempt (Warning). Passwords are never logged.
+* Projects: project created / deleted (Information); failed S3/CloudFront cleanup
+  on delete (Warning).
+* Deployments: deployment created and queued (Information); build orchestration
+  transitions — Building / Online / Failed — and log-collection failures
+  (DeploymentBuildWorker); build Job creation (KubernetesJobService).
+* Unhandled exceptions: logged as Error by `GlobalExceptionMiddleware` before the
+  500 response.
+
 ```text id="e1ecg7"
 ILogger<T>
 ```

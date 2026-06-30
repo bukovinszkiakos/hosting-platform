@@ -1,3 +1,5 @@
+"use client";
+
 import type { ComponentType } from "react";
 
 import Link from "next/link";
@@ -11,6 +13,7 @@ import {
   Server,
 } from "lucide-react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +60,11 @@ const steps = [
 ];
 
 export default function LandingPage() {
+  // The marketing page stays publicly viewable; when the visitor already has a
+  // session we just swap the call-to-action for an "Open app" shortcut (no hard
+  // redirect, security unchanged). See docs/09-frontend-pages.md "Landing Page".
+  const { user } = useAuth();
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border">
@@ -65,9 +73,15 @@ export default function LandingPage() {
             <Rocket className="size-5 text-primary" />
             <span className="text-base font-semibold">Hosting Platform</span>
           </div>
-          <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }))}>
-            Login
-          </Link>
+          {user ? (
+            <Link href="/home" className={cn(buttonVariants({ variant: "ghost" }))}>
+              Open app
+            </Link>
+          ) : (
+            <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }))}>
+              Login
+            </Link>
+          )}
         </div>
       </header>
 
@@ -82,22 +96,34 @@ export default function LandingPage() {
             infrastructure.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/register"
-              className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
-            >
-              Get Started
-              <ArrowRight />
-            </Link>
-            <Link
-              href="/login"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "lg" }),
-                "w-full sm:w-auto",
-              )}
-            >
-              Login
-            </Link>
+            {user ? (
+              <Link
+                href="/home"
+                className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
+              >
+                Open app
+                <ArrowRight />
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/register"
+                  className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
+                >
+                  Get Started
+                  <ArrowRight />
+                </Link>
+                <Link
+                  href="/login"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "lg" }),
+                    "w-full sm:w-auto",
+                  )}
+                >
+                  Login
+                </Link>
+              </>
+            )}
           </div>
         </section>
 
