@@ -179,6 +179,7 @@ Purpose:
 * Create EKS Cluster
 * Create Managed Node Group
 * Create Cluster IAM Roles
+* Enable the EKS Pod Identity Agent addon
 
 ## Inputs
 
@@ -244,11 +245,22 @@ Purpose:
 
 ## Responsibilities
 
-* EKS IAM Roles
-* Node Group IAM Roles
-* Backend Service IAM Roles
+* Backend Service IAM Role (S3 + CloudFront, least privilege)
+* EKS Pod Identity association binding that role to the `hosting-platform`
+  Kubernetes service account
 
-Permissions follow the Principle of Least Privilege.
+(The EKS cluster and node-group IAM roles are created in the EKS module, since
+a cluster cannot be created without them.)
+
+## Inputs
+
+* hosting_bucket_arn
+* cloudfront_distribution_id
+* eks_cluster_name
+
+Permissions follow the Principle of Least Privilege. The backend role is never
+attached to the node group; pods receive it only through the Pod Identity
+association and the `hosting-platform` service account.
 
 ---
 

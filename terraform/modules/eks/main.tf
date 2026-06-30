@@ -102,3 +102,23 @@ resource "aws_eks_node_group" "this" {
     Name = "${var.name_prefix}-ng"
   }
 }
+
+# ---------------------------------------------------------------------------
+# EKS Pod Identity Agent
+# ---------------------------------------------------------------------------
+# Runs the agent that lets pods assume IAM roles via Pod Identity associations.
+# The Backend Service role is associated with the platform service account in
+# the IAM module (Task 49); this addon makes that association effective at
+# runtime. See docs/06-terraform.md and docs/07-kubernetes.md.
+
+resource "aws_eks_addon" "pod_identity_agent" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "eks-pod-identity-agent"
+
+  # The agent runs as pods on the worker nodes, so the node group must exist.
+  depends_on = [aws_eks_node_group.this]
+
+  tags = {
+    Name = "${var.name_prefix}-pod-identity-agent"
+  }
+}

@@ -223,6 +223,11 @@ Examples:
 
 Roles follow the Principle of Least Privilege.
 
+The Backend Service Role (S3 + CloudFront access) is granted to pods through an
+**EKS Pod Identity** association with the `hosting-platform` Kubernetes service
+account, which the backend and the build Jobs run under. The node group role
+carries no S3 or CloudFront permissions.
+
 ---
 
 # Terraform Backend

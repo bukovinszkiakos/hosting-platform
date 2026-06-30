@@ -464,9 +464,12 @@ DeploymentBuildWorker dequeues deploymentId
 ```
 
 The build Job itself performs the git clone, framework detection, build, S3
-upload and CloudFront invalidation (Steps 5–11). The worker only creates the
-Job, polls it to completion, collects its logs, and records the resulting
-status. On success the public URL is produced by
+upload and CloudFront invalidation (Steps 5–11). The Job runs under the
+`hosting-platform` service account, which is bound to the Backend Service IAM
+role via EKS Pod Identity; this is what authorizes the Job's `aws s3 sync` and
+`aws cloudfront create-invalidation` calls (see `07-kubernetes.md`). The worker
+only creates the Job, polls it to completion, collects its logs, and records the
+resulting status. On success the public URL is produced by
 `CloudFrontService.GetPublicUrl` (`https://{domain}/{userId}/{projectId}`) and
 stored on the project (Step 12).
 

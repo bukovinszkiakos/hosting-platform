@@ -90,6 +90,9 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
                     Spec = new V1PodSpec
                     {
                         RestartPolicy = "Never",
+                        // Bound to the Backend Service IAM role via EKS Pod Identity, so
+                        // the build script can upload to S3 and invalidate CloudFront.
+                        ServiceAccountName = BuildJobNaming.ServiceAccountName,
                         Containers = [container],
                     },
                 },

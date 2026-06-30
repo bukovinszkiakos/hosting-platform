@@ -27,3 +27,25 @@ variable "cloudfront_distribution_id" {
     error_message = "cloudfront_distribution_id must not be empty."
   }
 }
+
+variable "eks_cluster_name" {
+  type        = string
+  description = "Name of the EKS cluster the Pod Identity association is created in."
+
+  validation {
+    condition     = length(var.eks_cluster_name) > 0
+    error_message = "eks_cluster_name must not be empty."
+  }
+}
+
+variable "service_account_namespace" {
+  type        = string
+  description = "Kubernetes namespace of the service account bound to the backend role."
+  default     = "hosting-platform"
+}
+
+variable "service_account_name" {
+  type        = string
+  description = "Kubernetes service account bound to the backend role via Pod Identity."
+  default     = "hosting-platform"
+}

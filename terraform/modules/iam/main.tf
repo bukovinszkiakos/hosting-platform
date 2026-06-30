@@ -5,9 +5,10 @@
 # distinct Backend Service role.
 #
 # Trust uses EKS Pod Identity (pods.eks.amazonaws.com) rather than IRSA, so no
-# OIDC provider / extra Terraform provider is required. At runtime the role is
-# bound to the backend's Kubernetes service account via the EKS Pod Identity
-# Agent addon and a pod identity association (Kubernetes manifests / Task 50).
+# OIDC provider / extra Terraform provider is required. The role is bound to the
+# platform's Kubernetes service account by the aws_eks_pod_identity_association
+# below; the Pod Identity Agent addon that makes it effective is enabled in the
+# EKS module.
 #
 # Permissions follow least privilege: scoped to the single hosting bucket and
 # the single CloudFront distribution.
@@ -70,4 +71,20 @@ resource "aws_iam_role_policy" "backend" {
       },
     ]
   })
+}
+
+# Binds the backend role to the platform's Kubernetes service account via EKS
+# Pod Identity. Any pod that uses this service account - the backend Deployment
+# and the per-deployment build Jobs - assumes the role and inherits its S3 and
+# CloudFront permissions, without granting anything to the node role. The Pod
+# Identity Agent addon is enabled in the EKS module.
+resource "aws_eks_pod_identity_association" "backend" {
+  cluster_name    = var.eks_cluster_name
+  namespace       = var.service_account_namespace
+  service_account = var.service_account_name
+  role_arn        = aws_iam_role.backend.arn
+
+  tags = {
+    Name = "${var.name_prefix}-backend"
+  }
 }

@@ -96,4 +96,5 @@ module "iam" {
   name_prefix                = local.name_prefix
   hosting_bucket_arn         = module.s3.bucket_arn
   cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+  eks_cluster_name           = module.eks.cluster_name
 }

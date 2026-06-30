@@ -6,11 +6,11 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: build-job # BuildService sets the real name: build-<deployment-id>
+  name: build-job # BuildJobSpecFactory sets the real name: build-<deployment-id>
   namespace: hosting-platform
   labels:
     app: hosting-platform-build
-    deployment-id: "" # BuildService sets the deployment id
+    deployment-id: "" # BuildJobSpecFactory sets the deployment id
 spec:
   backoffLimit: 0 # single attempt; a failed build becomes a Failed deployment (no retry)
   ttlSecondsAfterFinished: 3600 # auto-remove finished Jobs after 1 hour
@@ -18,9 +18,12 @@ spec:
     metadata:
       labels:
         app: hosting-platform-build
-        deployment-id: "" # BuildService sets the deployment id
+        deployment-id: "" # BuildJobSpecFactory sets the deployment id
     spec:
       restartPolicy: Never
+      # Bound to the Backend Service IAM role via EKS Pod Identity, granting the
+      # S3 + CloudFront access the build script needs (see k8s/base/serviceaccount.yaml).
+      serviceAccountName: hosting-platform
       containers:
         - name: build
           image: node:20-slim # must also provide git + AWS CLI v2 (docs/12 Build Environment)
@@ -41,7 +44,7 @@ spec:
               aws s3 sync "$OUTPUT" "s3://$S3_BUCKET/$USER_ID/$PROJECT_ID/" --delete --exclude ".git/*"
               aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/$USER_ID/$PROJECT_ID/*"
           env:
-            # Set dynamically by BuildService, per deployment
+            # Set dynamically by BuildJobSpecFactory, per deployment
             - name: DEPLOYMENT_ID
               value: ""
             - name: PROJECT_ID
@@ -50,7 +53,7 @@ spec:
               value: ""
             - name: REPOSITORY_URL
               value: ""
-            # Injected by BuildService from the backend AwsSettings configuration
+            # Injected by BuildJobSpecFactory from the backend AwsSettings configuration
             - name: S3_BUCKET
               value: ""
             - name: AWS_REGION

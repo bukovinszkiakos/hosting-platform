@@ -40,6 +40,7 @@ hosting-platform
 ├── Frontend Service
 ├── Backend Service
 ├── Build Jobs
+├── ServiceAccount
 ├── ConfigMaps
 ├── Secrets
 ├── Ingress
@@ -229,6 +230,28 @@ Examples:
 * AWS Access Configuration
 
 Future versions may migrate to AWS Secrets Manager.
+
+---
+
+# Service Account and AWS Access
+
+A single service account is used by the workloads that call AWS:
+
+```text
+hosting-platform
+```
+
+The backend Deployment and every build Job run under this service account.
+
+It is bound to the Backend Service IAM role through an **EKS Pod Identity**
+association (defined in the Terraform IAM module). The EKS Pod Identity Agent
+addon resolves AWS credentials for pods using this service account, so:
+
+* The build Job can run `aws s3 sync` and `aws cloudfront create-invalidation`.
+* No AWS permissions are attached to the node group role.
+
+No IRSA `role-arn` annotation is required; Pod Identity uses the association
+rather than the service account annotation.
 
 ---
 

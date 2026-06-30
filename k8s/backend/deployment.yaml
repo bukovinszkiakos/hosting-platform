@@ -15,6 +15,9 @@ spec:
       labels:
         app: backend
     spec:
+      # Bound to the Backend Service IAM role via EKS Pod Identity (see
+      # k8s/base/serviceaccount.yaml and terraform/modules/iam).
+      serviceAccountName: hosting-platform
       containers:
         - name: backend
           image: "PLACEHOLDER" # TODO: set ECR image URI
