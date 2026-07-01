@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CircleCheck, CircleX, FolderGit2, Rocket, ShieldX, Users } from "lucide-react";
+import {
+  CircleCheck,
+  CircleX,
+  FolderGit2,
+  Rocket,
+  ShieldX,
+  Users,
+} from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -76,19 +83,17 @@ function AdminView() {
   if (user && !isAdmin) {
     return (
       <AppShell isAdmin={false}>
-        <div className="mx-auto w-full max-w-6xl">
-          <Card className="flex flex-col items-center gap-3 p-12 text-center">
-            <span className="flex size-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-              <ShieldX className="size-6" />
-            </span>
-            <div>
-              <p className="text-base font-semibold">Access denied</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                This page is only available to administrators.
-              </p>
-            </div>
-          </Card>
-        </div>
+        <Card className="flex flex-col items-center gap-3 p-12 text-center">
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+            <ShieldX className="size-7" />
+          </span>
+          <div>
+            <p className="font-display text-xl font-bold">Access denied</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              This page is only available to administrators.
+            </p>
+          </div>
+        </Card>
       </AppShell>
     );
   }
@@ -98,59 +103,60 @@ function AdminView() {
 
   return (
     <AppShell isAdmin>
-      <div className="mx-auto w-full max-w-6xl">
-        <PageHeader
-          title="Admin"
-          description="Platform-wide users, projects, and deployment statistics."
-        />
+      <PageHeader
+        title="Admin"
+        description="Platform-wide users, projects, and deployment statistics."
+      />
 
-        <div className="mt-8">
-          {loading ? (
-            <AdminSkeleton />
-          ) : error ? (
-            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
-              {error}
-            </Card>
-          ) : (
-            <div className="flex flex-col gap-8">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <StatCard
-                  label="Total Users"
-                  value={users.length}
-                  icon={Users}
-                  accent="bg-primary/10 text-primary"
-                />
-                <StatCard
-                  label="Total Projects"
-                  value={projects.length}
-                  icon={FolderGit2}
-                  accent="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-                />
-                <StatCard
-                  label="Total Deployments"
-                  value={deployments.length}
-                  icon={Rocket}
-                  accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                />
-                <StatCard
-                  label="Online Deployments"
-                  value={onlineDeployments}
-                  icon={CircleCheck}
-                  accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                />
-                <StatCard
-                  label="Failed Deployments"
-                  value={failedDeployments}
-                  icon={CircleX}
-                  accent="bg-destructive/10 text-destructive"
-                />
-              </div>
-
-              <UsersTable users={users} />
-              <ProjectsTable projects={projects} />
+      <div className="mt-8">
+        {loading ? (
+          <AdminSkeleton />
+        ) : error ? (
+          <Card
+            className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
+            role="alert"
+          >
+            {error}
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-8">
+            <div className="grid gap-[18px] sm:grid-cols-2 lg:grid-cols-5">
+              <StatCard
+                label="Total Users"
+                value={users.length}
+                icon={Users}
+                accent="bg-primary/10 text-primary"
+              />
+              <StatCard
+                label="Total Projects"
+                value={projects.length}
+                icon={FolderGit2}
+                accent="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+              />
+              <StatCard
+                label="Total Deployments"
+                value={deployments.length}
+                icon={Rocket}
+                accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              />
+              <StatCard
+                label="Online Deployments"
+                value={onlineDeployments}
+                icon={CircleCheck}
+                accent="bg-success/10 text-success"
+              />
+              <StatCard
+                label="Failed Deployments"
+                value={failedDeployments}
+                icon={CircleX}
+                accent="bg-destructive/10 text-destructive"
+              />
             </div>
-          )}
-        </div>
+
+            <UsersTable users={users} />
+            <ProjectsTable projects={projects} />
+          </div>
+        )}
       </div>
     </AppShell>
   );
@@ -159,7 +165,7 @@ function AdminView() {
 function UsersTable({ users }: { users: AdminUser[] }) {
   return (
     <section>
-      <h2 className="text-lg font-semibold tracking-tight">Users</h2>
+      <h2 className="font-display text-lg font-semibold">Users</h2>
       {users.length === 0 ? (
         <EmptyRow message="No users found." />
       ) : (
@@ -167,7 +173,7 @@ function UsersTable({ users }: { users: AdminUser[] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-faint">
                   <Th>User</Th>
                   <Th>Email</Th>
                   <Th>Role</Th>
@@ -209,7 +215,7 @@ function UsersTable({ users }: { users: AdminUser[] }) {
 function ProjectsTable({ projects }: { projects: AdminProject[] }) {
   return (
     <section>
-      <h2 className="text-lg font-semibold tracking-tight">Projects</h2>
+      <h2 className="font-display text-lg font-semibold">Projects</h2>
       {projects.length === 0 ? (
         <EmptyRow message="No projects found." />
       ) : (
@@ -217,7 +223,7 @@ function ProjectsTable({ projects }: { projects: AdminProject[] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-faint">
                   <Th>Name</Th>
                   <Th>Owner</Th>
                   <Th>Status</Th>
@@ -266,7 +272,7 @@ function RolePill({ role }: { role: string }) {
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-4 py-3 font-medium">{children}</th>;
+  return <th className="px-4 py-3 font-semibold">{children}</th>;
 }
 
 function Td({
@@ -290,14 +296,14 @@ function EmptyRow({ message }: { message: string }) {
 function AdminSkeleton() {
   return (
     <div className="flex flex-col gap-8">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-[18px] sm:grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, index) => (
           <Card key={index} className="p-5">
             <div className="flex items-center justify-between">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="size-9 rounded-lg" />
             </div>
-            <Skeleton className="mt-3 h-8 w-12" />
+            <Skeleton className="mt-3 h-10 w-14" />
           </Card>
         ))}
       </div>

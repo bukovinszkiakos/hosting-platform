@@ -93,13 +93,13 @@ function ProjectDetailsView() {
       <div className="mx-auto w-full max-w-5xl">
         <Link
           href="/projects"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Back to projects
         </Link>
 
-        <div className="mt-4">
+        <div className="mt-5">
           {loading ? (
             <ProjectDetailsSkeleton />
           ) : error ? (
@@ -148,7 +148,7 @@ function ProjectInformation({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="truncate text-2xl font-semibold tracking-tight">
+              <h1 className="truncate font-display text-2xl font-bold">
                 {project.name}
               </h1>
               <StatusBadge status={project.currentStatus} />
@@ -319,7 +319,7 @@ function EditProjectForm({
 function DeploymentHistory({ deployments }: { deployments: Deployment[] }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight">Deployment history</h2>
+      <h2 className="font-display text-lg font-semibold">Deployment history</h2>
 
       {deployments.length === 0 ? (
         <Card className="mt-3 border-dashed p-10 text-center text-sm text-muted-foreground shadow-none">
@@ -378,11 +378,11 @@ function Field({
 }) {
   return (
     <div className="bg-card p-4">
-      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-faint">
         {icon}
         {label}
       </dt>
-      <dd className="mt-1.5 text-sm break-words">{children}</dd>
+      <dd className="mt-1.5 text-sm font-medium break-words">{children}</dd>
     </div>
   );
 }

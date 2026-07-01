@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
@@ -66,47 +67,57 @@ function ProjectsView() {
 
   return (
     <AppShell isAdmin={user?.role === "Admin"}>
-      <div className="mx-auto w-full max-w-6xl">
-        <PageHeader
-          title="Projects"
-          description="Manage the websites you deploy from GitHub."
-        >
-          {!loading && !error && (
-            <Button onClick={() => setCreating((value) => !value)}>
-              <Plus />
-              New project
-            </Button>
-          )}
-        </PageHeader>
+      <PageHeader
+        title="Projects"
+        description="Manage the websites you deploy from GitHub."
+      >
+        {!loading && !error && (
+          <Button onClick={() => setCreating((value) => !value)}>
+            <Plus />
+            New project
+          </Button>
+        )}
+      </PageHeader>
 
-        {creating && (
-          <div className="mt-6">
-            <CreateProjectForm
-              onCreated={handleCreated}
-              onCancel={() => setCreating(false)}
+      {creating && (
+        <div className="mt-6">
+          <CreateProjectForm
+            onCreated={handleCreated}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
+      )}
+
+      <div className="mt-6">
+        {loading ? (
+          <ProjectListSkeleton />
+        ) : error ? (
+          <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
+            {error}
+          </Card>
+        ) : projects && projects.length > 0 ? (
+          <ul className="flex flex-col gap-3">
+            {projects.map((project) => (
+              <li key={project.id}>
+                <ProjectCard project={project} onDeleted={handleDeleted} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="mt-8">
+            <EmptyState
+              icon={FolderGit2}
+              title="No projects yet"
+              description="Create your first project to deploy a website from GitHub."
+              action={
+                <Button onClick={() => setCreating(true)}>
+                  <Plus />
+                  New project
+                </Button>
+              }
             />
           </div>
         )}
-
-        <div className="mt-6">
-          {loading ? (
-            <ProjectListSkeleton />
-          ) : error ? (
-            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
-              {error}
-            </Card>
-          ) : projects && projects.length > 0 ? (
-            <ul className="flex flex-col gap-3">
-              {projects.map((project) => (
-                <li key={project.id}>
-                  <ProjectCard project={project} onDeleted={handleDeleted} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState onCreate={() => setCreating(true)} />
-          )}
-        </div>
       </div>
     </AppShell>
   );
@@ -152,7 +163,7 @@ function CreateProjectForm({
 
   return (
     <Card className="p-6 duration-300 animate-in fade-in slide-in-from-top-2">
-      <h2 className="text-base font-semibold">New project</h2>
+      <h2 className="font-display text-lg font-semibold">New project</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Connect a public GitHub repository to deploy.
       </p>
@@ -248,7 +259,7 @@ function ProjectCard({
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/projects/${project.id}`}
-                className="truncate font-semibold hover:text-primary hover:underline"
+                className="truncate font-display text-lg font-semibold hover:text-primary hover:underline"
               >
                 {project.name}
               </Link>
@@ -272,7 +283,7 @@ function ProjectCard({
               </a>
             )}
 
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs text-faint">
               Updated {formatDate(project.updatedAt)}
             </p>
           </div>
@@ -333,26 +344,6 @@ function ProjectCard({
 // A link styled like a small outline button (Link can't use the Button primitive).
 const buttonLinkClass =
   "inline-flex h-8 items-center rounded-[min(var(--radius-md),12px)] border border-border bg-background px-3 text-[0.8rem] font-medium shadow-xs transition-colors hover:bg-muted";
-
-function EmptyState({ onCreate }: { onCreate: () => void }) {
-  return (
-    <Card className="flex flex-col items-center gap-3 border-dashed p-12 text-center shadow-none">
-      <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <FolderGit2 className="size-6" />
-      </span>
-      <div>
-        <p className="text-base font-semibold">No projects yet</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Create your first project to deploy a website from GitHub.
-        </p>
-      </div>
-      <Button onClick={onCreate} className="mt-1">
-        <Plus />
-        New project
-      </Button>
-    </Card>
-  );
-}
 
 function ProjectListSkeleton() {
   return (

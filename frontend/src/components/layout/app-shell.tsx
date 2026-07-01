@@ -18,8 +18,8 @@ export function AppShell({
       <Sidebar isAdmin={isAdmin} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav />
-        <main className="flex-1 px-4 py-6 duration-500 animate-in fade-in md:px-8 md:py-8">
-          {children}
+        <main className="flex-1 px-4 py-8 md:px-10 md:py-11">
+          <div className="mx-auto w-full max-w-[1120px] animate-fade-up">{children}</div>
         </main>
       </div>
     </div>

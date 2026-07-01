@@ -64,13 +64,13 @@ function DeploymentDetailsView() {
       <div className="mx-auto w-full max-w-5xl">
         <Link
           href="/projects"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Back to projects
         </Link>
 
-        <div className="mt-4">
+        <div className="mt-5">
           {loading ? (
             <DeploymentDetailsSkeleton />
           ) : error ? (
@@ -101,7 +101,7 @@ function DeploymentInformation({ deployment }: { deployment: Deployment }) {
         </span>
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-semibold tracking-tight">Deployment</h1>
+            <h1 className="font-display text-2xl font-bold">Deployment</h1>
             <StatusBadge status={deployment.status} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -156,7 +156,7 @@ function ErrorInformation({ message }: { message: string }) {
 function BuildLogs({ logs }: { logs: DeploymentLog[] }) {
   return (
     <div>
-      <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+      <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
         <Terminal className="size-4.5 text-muted-foreground" />
         Build logs
       </h2>
@@ -206,8 +206,10 @@ function Field({
 }) {
   return (
     <div className={full ? "bg-card p-4 sm:col-span-2" : "bg-card p-4"}>
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1.5 text-sm break-words">{children}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-faint">
+        {label}
+      </dt>
+      <dd className="mt-1.5 text-sm font-medium break-words">{children}</dd>
     </div>
   );
 }

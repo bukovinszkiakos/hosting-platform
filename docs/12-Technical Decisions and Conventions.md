@@ -484,18 +484,31 @@ Protected pages should verify authentication before rendering.
 The frontend follows one consistent visual language defined by design tokens in
 `app/globals.css` and a small set of shared primitives.
 
-* **Brand colour**: an indigo/violet `--primary` (and `--ring`), used for primary
-  buttons, links, focus rings, active navigation and accents.
-* **Typography**: Geist Sans (`--font-sans`) for UI, Geist Mono for logs/code.
+* **Brand colour**: an indigo/violet `--primary`/`--brand` (≈ `#5b52e0`, also
+  `--ring`), used for primary buttons, links, focus rings, active navigation and
+  accents. Primary buttons and the brand mark use a subtle brand gradient.
+* **Typography**: Instrument Sans (`--font-sans`) for UI/body, Bricolage Grotesque
+  (`--font-heading`, applied via the `font-display` utility) for headings and the
+  brand wordmark, and JetBrains Mono (`--font-mono`) for logs/code. Fonts are
+  loaded with `next/font/google` in `app/layout.tsx`.
 * **Surfaces**: tokenised neutrals with a faint cool tint; cards use `--card`,
   rounded corners (`--radius` = 0.7rem), thin borders and soft layered shadows.
+  Semantic status tokens: `--success` (online), `--warn`, `--destructive` (failed);
+  `--faint` is the tertiary text colour for metadata/captions.
+* **Backdrops**: marketing and auth surfaces use the `bg-hero-glow` (brand radial
+  glow) and `bg-grid-mask` (masked dot-grid) helpers from `globals.css`.
 * **Shared UI primitives** (`components/ui/`): `Button`, `Input`, `Label`,
   `Card` (with optional `interactive` hover-lift), `StatusBadge` (colour-coded with
-  a pulsing dot for in-progress statuses), `StatCard`, `PageHeader`, `Skeleton`.
-* **Layout** (`components/layout/`): `AppShell` = `Sidebar` + `TopNav` + content;
-  navigation items come from a single `nav-items` source.
+  a pulsing dot for in-progress statuses), `StatCard` (with an optional `hint`),
+  `PageHeader`, `Skeleton`, `Logo` (the gradient brand mark) and `EmptyState`
+  (dashed-border empty state with an optional action).
+* **Layout** (`components/layout/`): `AppShell` = `Sidebar` + `TopNav` + a
+  centred `max-w-[1120px]` content column; `AuthShell` is the shared centred
+  layout for the login/register pages; navigation items come from a single
+  `nav-items` source.
 * **Motion**: tasteful and subtle — hover elevation on interactive cards, button
-  press feedback, an animated status dot, content fade-in, and skeleton loaders.
+  press feedback, an animated status dot, `fadeUp`/`fadeIn` content entrances
+  (the `animate-fade-up` / `animate-fade-in` utilities), and skeleton loaders.
   Animations are kept minimal and premium, never distracting.
 
 ## Design Goals

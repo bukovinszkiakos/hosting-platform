@@ -11,11 +11,13 @@ export function StatCard({
   value,
   icon: Icon,
   accent = "bg-muted text-muted-foreground",
+  hint,
 }: {
   label: string;
   value: number | string;
   icon: ComponentType<{ className?: string }>;
   accent?: string;
+  hint?: string;
 }) {
   return (
     <Card className="p-5">
@@ -30,9 +32,10 @@ export function StatCard({
           <Icon className="size-4.5" />
         </span>
       </div>
-      <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">
+      <p className="mt-3 font-display text-[2.5rem] font-bold leading-none tabular-nums">
         {value}
       </p>
+      {hint && <p className="mt-2 text-xs text-faint">{hint}</p>}
     </Card>
   );
 }

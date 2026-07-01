@@ -69,45 +69,43 @@ function ProfileView() {
 
   return (
     <AppShell isAdmin={user?.role === "Admin"}>
-      <div className="mx-auto w-full max-w-3xl">
-        <PageHeader
-          title="Profile"
-          description="Your account information and settings."
-        />
+      <PageHeader
+        title="Profile"
+        description="Your account information and settings."
+      />
 
-        <div className="mt-8">
-          {loading ? (
-            <ProfileSkeleton />
-          ) : error ? (
-            <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
-              {error}
-            </Card>
-          ) : profile ? (
-            <div className="flex flex-col gap-6">
-              <ProfileInformation profile={profile} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <StatCard
-                  label="Projects"
-                  value={profile.projectsCount}
-                  icon={FolderGit2}
-                  accent="bg-primary/10 text-primary"
-                />
-                <StatCard
-                  label="Deployments"
-                  value={profile.deploymentsCount}
-                  icon={Rocket}
-                  accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                />
-              </div>
-              <EditProfileForm
-                key={`${profile.displayName}|${profile.email}`}
-                initialDisplayName={profile.displayName}
-                initialEmail={profile.email}
-                onUpdated={handleUpdated}
+      <div className="mt-8">
+        {loading ? (
+          <ProfileSkeleton />
+        ) : error ? (
+          <Card className="border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive" role="alert">
+            {error}
+          </Card>
+        ) : profile ? (
+          <div className="flex flex-col gap-[22px]">
+            <ProfileInformation profile={profile} />
+            <div className="grid gap-[18px] sm:grid-cols-2">
+              <StatCard
+                label="Projects"
+                value={profile.projectsCount}
+                icon={FolderGit2}
+                accent="bg-primary/10 text-primary"
+              />
+              <StatCard
+                label="Deployments"
+                value={profile.deploymentsCount}
+                icon={Rocket}
+                accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
               />
             </div>
-          ) : null}
-        </div>
+            <EditProfileForm
+              key={`${profile.displayName}|${profile.email}`}
+              initialDisplayName={profile.displayName}
+              initialEmail={profile.email}
+              onUpdated={handleUpdated}
+            />
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );
@@ -117,21 +115,21 @@ function ProfileInformation({ profile }: { profile: Profile }) {
   const isAdmin = profile.role === "Admin";
   return (
     <Card className="p-6">
-      <div className="flex items-center gap-4">
-        <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-semibold text-primary">
+      <div className="flex items-center gap-[18px]">
+        <span className="flex size-[60px] shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(150deg,color-mix(in_oklch,var(--brand),white_30%),color-mix(in_oklch,var(--brand),white_74%))] text-xl font-bold text-[color-mix(in_oklch,var(--brand),black_8%)] shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--brand),white_70%)]">
           {initials(profile.displayName)}
         </span>
         <div className="min-w-0">
-          <h2 className="truncate text-xl font-semibold tracking-tight">
+          <h2 className="truncate font-display text-[22px] font-bold">
             {profile.displayName}
           </h2>
           <p className="truncate text-sm text-muted-foreground">{profile.email}</p>
           <span
             className={cn(
-              "mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+              "mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
               isAdmin
                 ? "border-primary/25 bg-primary/10 text-primary"
-                : "border-border bg-muted text-muted-foreground",
+                : "border-primary/20 bg-primary/10 text-primary",
             )}
           >
             {isAdmin && <Shield className="size-3" />}
@@ -140,10 +138,16 @@ function ProfileInformation({ profile }: { profile: Profile }) {
         </div>
       </div>
 
-      <dl className="mt-6 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
-        <Field label="Display name">{profile.displayName}</Field>
-        <Field label="Email">{profile.email}</Field>
-        <Field label="Role">{profile.role}</Field>
+      <dl className="mt-[22px] grid overflow-hidden rounded-2xl border border-border sm:grid-cols-2">
+        <Field label="Display name" className="border-b border-border sm:border-r">
+          {profile.displayName}
+        </Field>
+        <Field label="Email" className="border-b border-border">
+          {profile.email}
+        </Field>
+        <Field label="Role" className="border-b border-border sm:border-b-0 sm:border-r">
+          {profile.role}
+        </Field>
         <Field label="Member since">{formatDate(profile.createdAt)}</Field>
       </dl>
     </Card>
@@ -199,35 +203,37 @@ function EditProfileForm({
 
   return (
     <Card className="p-6">
-      <h2 className="font-semibold">Edit profile</h2>
+      <h2 className="font-display text-lg font-semibold">Edit profile</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Update your display name and email address.
       </p>
       <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4" noValidate>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="displayName">Display name</Label>
-          <Input
-            id="displayName"
-            type="text"
-            autoComplete="name"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            aria-invalid={error !== null}
-            disabled={submitting}
-          />
-        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="displayName">Display name</Label>
+            <Input
+              id="displayName"
+              type="text"
+              autoComplete="name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              aria-invalid={error !== null}
+              disabled={submitting}
+            />
+          </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            aria-invalid={error !== null}
-            disabled={submitting}
-          />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={error !== null}
+              disabled={submitting}
+            />
+          </div>
         </div>
 
         {error && (
@@ -249,7 +255,7 @@ function EditProfileForm({
         {success && (
           <p
             role="status"
-            className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400"
+            className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-sm text-success"
           >
             {success}
           </p>
@@ -268,30 +274,34 @@ function EditProfileForm({
 function Field({
   label,
   children,
+  className,
 }: {
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="bg-card p-4">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1.5 text-sm break-words">{children}</dd>
+    <div className={cn("p-4", className)}>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-faint">
+        {label}
+      </dt>
+      <dd className="mt-1.5 text-sm font-medium break-words">{children}</dd>
     </div>
   );
 }
 
 function ProfileSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[22px]">
       <Card className="p-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="size-16 rounded-2xl" />
+        <div className="flex items-center gap-[18px]">
+          <Skeleton className="size-[60px] rounded-2xl" />
           <div>
             <Skeleton className="h-6 w-40" />
             <Skeleton className="mt-2 h-4 w-52" />
           </div>
         </div>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="mt-[22px] grid gap-4 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index}>
               <Skeleton className="h-3 w-24" />
@@ -300,9 +310,9 @@ function ProfileSkeleton() {
           ))}
         </div>
       </Card>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Skeleton className="h-24 rounded-xl" />
-        <Skeleton className="h-24 rounded-xl" />
+      <div className="grid gap-[18px] sm:grid-cols-2">
+        <Skeleton className="h-28 rounded-2xl" />
+        <Skeleton className="h-28 rounded-2xl" />
       </div>
     </div>
   );

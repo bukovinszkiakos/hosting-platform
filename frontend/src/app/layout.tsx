@@ -1,17 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Body / UI typeface (see docs/12 "Design System" — Typography).
+const instrumentSans = Instrument_Sans({
+  variable: "--font-instrument-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Display typeface for headings and the brand wordmark.
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
   subsets: ["latin"],
+  display: "swap",
+});
+
+// Monospace for logs and code.
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -28,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${instrumentSans.variable} ${bricolage.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <AuthProvider>{children}</AuthProvider>
       </body>

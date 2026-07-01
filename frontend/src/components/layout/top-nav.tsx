@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, Rocket, X } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { navItemsForRole } from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 import { cn, initials } from "@/lib/utils";
 
 // Top navigation bar (see docs/09-frontend-pages.md "Layout Structure" and
@@ -35,26 +36,22 @@ export function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-6">
+    <header className="sticky top-0 z-30 flex h-[66px] items-center border-b border-border px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70 md:px-10">
       <Link href="/home" className="flex items-center gap-2.5 md:hidden">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Rocket className="size-4.5" />
-        </span>
-        <span className="text-[0.95rem] font-semibold tracking-tight">
+        <Logo size="md" />
+        <span className="font-display text-[0.95rem] font-bold tracking-tight">
           Hosting Platform
         </span>
       </Link>
 
       <div className="ml-auto flex items-center gap-3">
         {user && (
-          <div className="flex items-center gap-2.5">
-            <span className="hidden text-right text-sm leading-tight sm:block">
-              <span className="block font-medium">{user.displayName}</span>
-              <span className="block text-xs text-muted-foreground">
-                {user.role}
-              </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-right leading-tight sm:block">
+              <span className="block text-sm font-semibold">{user.displayName}</span>
+              <span className="block text-[12.5px] text-faint">{user.role}</span>
             </span>
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+            <span className="flex size-9 items-center justify-center rounded-[10px] bg-primary/10 text-xs font-bold text-primary shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary),white_76%)]">
               {initials(user.displayName)}
             </span>
           </div>
@@ -74,7 +71,7 @@ export function TopNav() {
       </div>
 
       {menuOpen && (
-        <div className="absolute inset-x-0 top-16 z-20 border-b border-border bg-background p-3 shadow-lg md:hidden">
+        <div className="absolute inset-x-0 top-[66px] z-20 border-b border-border bg-background p-3 shadow-lg md:hidden">
           <nav className="flex flex-col gap-1">
             {items.map((item) => {
               const active =
@@ -87,15 +84,13 @@ export function TopNav() {
                   onClick={() => setMenuOpen(false)}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    "flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors",
                     active
-                      ? "bg-accent text-accent-foreground"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
-                  <Icon
-                    className={cn("size-4.5", active && "text-primary")}
-                  />
+                  <Icon className="size-[19px]" />
                   {item.label}
                 </Link>
               );
@@ -105,9 +100,9 @@ export function TopNav() {
               type="button"
               onClick={handleLogout}
               disabled={loggingOut}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+              className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
             >
-              <LogOut className="size-4.5" />
+              <LogOut className="size-[18px]" />
               {loggingOut ? "Signing out…" : "Log out"}
             </button>
           </nav>

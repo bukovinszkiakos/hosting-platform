@@ -16,6 +16,7 @@ import {
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { buttonVariants } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 
 type Feature = {
@@ -81,14 +82,12 @@ export default function LandingPage() {
   const { user } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <Rocket className="size-4.5" />
-            </span>
-            <span className="text-[0.95rem] font-semibold tracking-tight">
+    <div className="flex min-h-screen animate-fade-in flex-col bg-background">
+      <header className="sticky top-0 z-50 border-b border-border backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-6 py-3.5 sm:px-8">
+          <div className="flex items-center gap-3">
+            <Logo size="lg" />
+            <span className="font-display text-[19px] font-bold">
               Hosting Platform
             </span>
           </div>
@@ -115,21 +114,22 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden border-b border-border">
-          <div className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-          <div className="relative mx-auto w-full max-w-6xl px-4 py-24 text-center sm:px-6 sm:py-32">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+        <section className="relative overflow-hidden">
+          <div aria-hidden className="pointer-events-none absolute inset-0 bg-hero-glow" />
+          <div aria-hidden className="pointer-events-none absolute inset-0 bg-grid-mask" />
+          <div className="relative mx-auto w-full max-w-[900px] px-6 py-28 text-center sm:px-8 sm:py-32">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-semibold text-primary shadow-xs">
               <Sparkles className="size-3.5" />
               Deploy static sites from GitHub
             </span>
-            <h1 className="mx-auto mt-6 max-w-3xl text-balance text-4xl font-semibold tracking-tight sm:text-6xl">
-              Deploy your website{" "}
-              <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            <h1 className="font-display mx-auto mt-7 max-w-3xl text-balance text-5xl font-bold leading-[1.02] sm:text-[78px]">
+              Deploy your website
+              <br />
+              <span className="bg-[linear-gradient(115deg,var(--brand),color-mix(in_oklch,var(--brand)_60%,oklch(0.62_0.2_330)))] bg-clip-text text-transparent">
                 in minutes
               </span>
             </h1>
-            <p className="mx-auto mt-6 max-w-xl text-pretty text-lg text-muted-foreground">
+            <p className="mx-auto mt-6 max-w-xl text-pretty text-lg text-muted-foreground sm:text-xl">
               Publish your static website directly from GitHub without managing
               AWS infrastructure, build pipelines, or DNS.
             </p>
@@ -137,10 +137,7 @@ export default function LandingPage() {
               {user ? (
                 <Link
                   href="/home"
-                  className={cn(
-                    buttonVariants({ size: "lg" }),
-                    "w-full sm:w-auto",
-                  )}
+                  className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
                 >
                   Open app
                   <ArrowRight />
@@ -149,10 +146,7 @@ export default function LandingPage() {
                 <>
                   <Link
                     href="/register"
-                    className={cn(
-                      buttonVariants({ size: "lg" }),
-                      "w-full sm:w-auto",
-                    )}
+                    className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
                   >
                     Get Started
                     <ArrowRight />
@@ -173,24 +167,23 @@ export default function LandingPage() {
         </section>
 
         {/* How it works */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
+        <section className="mx-auto w-full max-w-[1120px] px-6 pb-24 pt-6 sm:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-semibold tracking-tight">How it works</h2>
-            <p className="mt-3 text-muted-foreground">
+            <h2 className="font-display text-3xl font-bold sm:text-[44px]">
+              How it works
+            </h2>
+            <p className="mt-2.5 text-lg text-muted-foreground">
               From repository to live site in three steps.
             </p>
           </div>
-          <div className="mt-14 grid gap-8 sm:grid-cols-3">
+          <div className="mt-14 grid gap-5 sm:grid-cols-3">
             {steps.map((step, index) => (
-              <div key={step.title} className="relative text-center">
-                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground shadow-sm">
+              <div key={step.title} className="px-3.5 py-2 text-center">
+                <div className="mx-auto mb-5 flex size-13 items-center justify-center rounded-[15px] bg-[linear-gradient(150deg,var(--brand),color-mix(in_oklch,var(--brand),black_22%))] font-display text-xl font-bold text-white shadow-[0_8px_18px_-6px_color-mix(in_oklch,var(--brand)_55%,transparent)]">
                   {index + 1}
                 </div>
-                {index < steps.length - 1 && (
-                  <span className="absolute left-[calc(50%+2.5rem)] top-6 hidden h-px w-[calc(100%-5rem)] bg-border sm:block" />
-                )}
-                <h3 className="mt-5 font-medium">{step.title}</h3>
-                <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
+                <h3 className="font-display text-xl font-semibold">{step.title}</h3>
+                <p className="mx-auto mt-2 max-w-[280px] text-sm text-muted-foreground">
                   {step.description}
                 </p>
               </div>
@@ -199,29 +192,31 @@ export default function LandingPage() {
         </section>
 
         {/* Features */}
-        <section className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
+        <section className="border-y border-border bg-[color-mix(in_oklch,var(--background),oklch(0.5_0.03_265)_3%)]">
+          <div className="mx-auto w-full max-w-[1120px] px-6 py-22 sm:px-8">
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight">
+              <h2 className="font-display text-3xl font-bold sm:text-[44px]">
                 Everything you need to ship
               </h2>
-              <p className="mt-3 text-muted-foreground">
+              <p className="mt-2.5 text-lg text-muted-foreground">
                 A complete static hosting workflow, without the infrastructure work.
               </p>
             </div>
-            <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-13 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((feature) => {
                 const Icon = feature.icon;
                 return (
                   <div
                     key={feature.title}
-                    className="group rounded-xl border border-border bg-card p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                    className="rounded-2xl border border-border bg-card p-6 shadow-[0_1px_2px_rgba(20,20,40,0.04),0_14px_30px_-20px_rgba(20,20,45,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(20,20,40,0.05),0_22px_42px_-22px_rgba(20,20,45,0.28)]"
                   >
-                    <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                    <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       <Icon className="size-5" />
                     </span>
-                    <h3 className="mt-4 font-medium">{feature.title}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground">
+                    <h3 className="font-display mt-4 text-lg font-semibold">
+                      {feature.title}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
                       {feature.description}
                     </p>
                   </div>
@@ -232,34 +227,44 @@ export default function LandingPage() {
         </section>
 
         {/* CTA */}
-        <section className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
-          <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent px-6 py-14 text-center">
-            <h2 className="text-3xl font-semibold tracking-tight">
-              Ready to deploy?
-            </h2>
-            <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-              Create an account and publish your first site in minutes.
-            </p>
-            <div className="mt-8 flex justify-center">
-              <Link
-                href={user ? "/home" : "/register"}
-                className={cn(buttonVariants({ size: "lg" }))}
-              >
-                {user ? "Open app" : "Get Started"}
-                <ArrowRight />
-              </Link>
+        <section className="mx-auto w-full max-w-[1120px] px-6 py-22 sm:px-8">
+          <div className="relative overflow-hidden rounded-[26px] bg-[linear-gradient(155deg,color-mix(in_oklch,var(--brand),black_4%),color-mix(in_oklch,var(--brand),black_30%))] px-6 py-[76px] text-center shadow-[0_34px_66px_-34px_color-mix(in_oklch,var(--brand)_62%,transparent)]">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-100 [background-image:radial-gradient(rgba(255,255,255,0.14)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(70%_80%_at_50%_0%,#000,transparent)]"
+            />
+            <div className="relative">
+              <h2 className="font-display text-3xl font-bold text-white sm:text-5xl">
+                Ready to deploy?
+              </h2>
+              <p className="mx-auto mt-4 max-w-md text-lg text-white/80">
+                Create an account and publish your first site in minutes.
+              </p>
+              <div className="mt-8 flex justify-center">
+                <Link
+                  href={user ? "/home" : "/register"}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 font-bold text-[color-mix(in_oklch,var(--brand),black_12%)] shadow-[0_10px_26px_-10px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5"
+                >
+                  {user ? "Open app" : "Get Started"}
+                  <ArrowRight className="size-4.5" />
+                </Link>
+              </div>
             </div>
           </div>
         </section>
       </main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2">
-            <Rocket className="size-4 text-primary" />
-            <span className="font-medium text-foreground">Hosting Platform</span>
+        <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center justify-between gap-3.5 px-6 py-7 sm:flex-row sm:px-8">
+          <div className="flex items-center gap-2.5">
+            <Logo size="sm" />
+            <span className="text-sm font-semibold text-foreground">
+              Hosting Platform
+            </span>
           </div>
-          <span>Deploy static websites from GitHub.</span>
+          <span className="text-[13.5px] text-faint">
+            © 2026 Hosting Platform. Deploy static sites from GitHub.
+          </span>
         </div>
       </footer>
     </div>
