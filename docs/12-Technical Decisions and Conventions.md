@@ -188,6 +188,17 @@ Custom password hashing implementations should not be used.
 
 ---
 
+# Account Lockout
+
+Login uses Identity's lockout (`PasswordSignInAsync(..., lockoutOnFailure: true)`)
+with the framework defaults (5 failed attempts, 5-minute lockout) for brute-force
+protection. Regardless of the reason — wrong password, unknown email, or a
+locked-out account — the API returns the same generic `401` (`Invalid email or
+password`) so it never reveals whether an account exists. Lockout is logged as a
+distinct Warning for observability.
+
+---
+
 # Authorization
 
 Authorization is role-based.
@@ -337,6 +348,18 @@ This single shape covers both kinds of validation:
   required field or malformed JSON), mapped to the same shape by a custom
   `InvalidModelStateResponseFactory` (configured in `Program.cs`) instead of the
   default RFC7807 ProblemDetails.
+
+## Input Validation Rules
+
+* **String lengths** are capped with DataAnnotations (`[StringLength]`) on the
+  request DTOs, so oversized input is rejected by model validation before it
+  reaches a service: `Name` and `DisplayName` ≤ 150 characters, `RepositoryUrl`
+  ≤ 2048 characters.
+* **Repository URL** is optional on project create/update (a deployment later
+  requires one), but when provided it must be a well-formed absolute `http`/`https`
+  URL; otherwise the service throws `ValidationException` (`Repository URL is
+  invalid`). The URL is not otherwise restricted — an unreachable or private
+  repository is still surfaced as a failed build (see `10-deployment-workflow.md`).
 
 ---
 

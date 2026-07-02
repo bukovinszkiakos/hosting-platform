@@ -39,6 +39,18 @@ public class DeploymentService : IDeploymentService
             throw new ValidationException("Repository URL is required");
         }
 
+        // One active deployment per project: reject a new deployment while another is
+        // still in flight, so two build Jobs cannot race on the same S3 prefix.
+        var hasActiveDeployment = await _context.Deployments.AnyAsync(d =>
+            d.ProjectId == project.Id &&
+            (d.Status == DeploymentStatus.Pending ||
+             d.Status == DeploymentStatus.Building ||
+             d.Status == DeploymentStatus.Deploying));
+        if (hasActiveDeployment)
+        {
+            throw new ValidationException("A deployment is already in progress.");
+        }
+
         var now = DateTime.UtcNow;
         var deployment = new Deployment
         {

@@ -57,16 +57,26 @@ public class AuthService : IAuthService
 
     public async Task LoginAsync(LoginRequest request)
     {
-        // UserName equals Email, so sign in by the provided email. A failed result
-        // is returned uniformly to avoid revealing whether the email exists.
+        // UserName equals Email, so sign in by the provided email. Failed attempts
+        // count towards Identity's lockout (brute-force protection); a failed result
+        // is still returned uniformly to avoid revealing whether the email exists.
         var result = await _signInManager.PasswordSignInAsync(
-            request.Email, request.Password, isPersistent: true, lockoutOnFailure: false);
+            request.Email, request.Password, isPersistent: true, lockoutOnFailure: true);
 
         if (!result.Succeeded)
         {
             // Security-relevant: a failed sign-in. The email is the login identifier,
-            // not a secret; the password is never logged.
-            _logger.LogWarning("Failed login attempt for {Email}", request.Email);
+            // not a secret; the password is never logged. Lockout is logged distinctly
+            // for observability but the response stays generic.
+            if (result.IsLockedOut)
+            {
+                _logger.LogWarning("Login blocked for locked-out account {Email}", request.Email);
+            }
+            else
+            {
+                _logger.LogWarning("Failed login attempt for {Email}", request.Email);
+            }
+
             throw new UnauthorizedException("Invalid email or password");
         }
 

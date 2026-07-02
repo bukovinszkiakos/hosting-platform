@@ -478,11 +478,34 @@ resulting status. On success the public URL is produced by
 `CloudFrontService.GetPublicUrl` (`https://{domain}/{userId}/{projectId}`) and
 stored on the project (Step 12).
 
+The build Job carries `activeDeadlineSeconds` (10 minutes, matching the worker's
+poll timeout), so Kubernetes terminates a build that exceeds the limit. This
+guarantees a timed-out build cannot keep running and publish to S3/CloudFront
+after its deployment has already been marked `Failed`.
+
+## Startup Recovery
+
+The queue is in-memory and does not survive a restart, so a deployment left in a
+non-terminal state (`Pending`, `Building` or `Deploying`) after a pod restart can
+never make progress. On startup the `DeploymentBuildWorker` reconciles these:
+each such deployment is marked `Failed` with the message
+`Deployment interrupted by a service restart` (its project status is updated to
+match). Interrupted deployments are **not** requeued — the user simply starts a
+new deployment. This keeps recovery simple and avoids duplicate build Jobs.
+
+## One Active Deployment Per Project
+
+`POST /api/projects/{id}/deploy` rejects a new deployment while another deployment
+for the same project is still `Pending`, `Building` or `Deploying`, returning a
+`400` validation error (`A deployment is already in progress.`). This prevents two
+build Jobs from racing on the same S3 prefix.
+
 ## MVP Limitations
 
 * The queue is in-memory and per-pod: a deployment is processed by the same
   backend pod that accepted the request. If that pod restarts mid-build, the
-  deployment is left in `Building` and is not automatically retried.
+  deployment is marked `Failed` on the next startup (see "Startup Recovery")
+  rather than retried.
 * Deployments are processed one at a time per pod.
 * A failed build is not retried (`backoffLimit: 0`); it becomes a `Failed`
   deployment.

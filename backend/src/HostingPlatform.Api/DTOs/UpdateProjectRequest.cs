@@ -1,3 +1,7 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HostingPlatform.Api.DTOs;
 
-public record UpdateProjectRequest(string Name, string RepositoryUrl);
+public record UpdateProjectRequest(
+    [StringLength(150)] string Name,
+    [StringLength(2048)] string RepositoryUrl);

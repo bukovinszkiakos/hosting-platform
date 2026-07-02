@@ -152,7 +152,10 @@ Memory: 1Gi
 Whenever a deployment is started, the backend's in-process build worker creates
 a Kubernetes Job (see `10-deployment-workflow.md` "Deployment Orchestration").
 
-Each deployment runs as a separate Job.
+Each deployment runs as a separate Job. The Job sets `backoffLimit: 0` (no retry),
+`ttlSecondsAfterFinished: 3600` (auto-cleanup) and `activeDeadlineSeconds: 600`
+(Kubernetes terminates a build that exceeds 10 minutes so it cannot publish after
+the deployment has been marked `Failed`).
 
 ---
 
@@ -258,6 +261,19 @@ addon resolves AWS credentials for pods using this service account, so:
 
 No IRSA `role-arn` annotation is required; Pod Identity uses the association
 rather than the service account annotation.
+
+Build pods set `automountServiceAccountToken: false`: the build container runs
+untrusted repository code (`npm install` executes arbitrary scripts) and never
+calls the Kubernetes API, so the default API token is not mounted. Pod Identity
+injects its own credential token separately, so AWS access is unaffected.
+
+> **Deferred hardening.** The backend Deployment and the build Jobs currently
+> share this single service account and IAM role. Giving build Jobs a dedicated
+> service account and a minimal, build-only IAM role — ideally with per-project
+> session policies scoping S3 access to `{userId}/{projectId}/` — is a planned
+> future enhancement. It is deferred for the MVP because, without per-project
+> scoping, a separate build role (still bucket-wide) adds infrastructure for only
+> a marginal isolation gain.
 
 ---
 

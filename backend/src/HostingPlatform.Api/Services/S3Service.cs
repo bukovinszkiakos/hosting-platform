@@ -20,21 +20,6 @@ public class S3Service : IS3Service
     // (see docs/05-aws-architecture.md "S3 Storage").
     public string GetSiteKeyPrefix(Guid userId, Guid projectId) => $"{userId}/{projectId}/";
 
-    public async Task UploadFileAsync(
-        string key, Stream content, string contentType, CancellationToken cancellationToken = default)
-    {
-        var request = new PutObjectRequest
-        {
-            BucketName = _aws.BucketName,
-            Key = key,
-            InputStream = content,
-            ContentType = contentType,
-            AutoCloseStream = false,
-        };
-
-        await _s3.PutObjectAsync(request, cancellationToken);
-    }
-
     public async Task DeleteSiteAsync(
         Guid userId, Guid projectId, CancellationToken cancellationToken = default)
     {

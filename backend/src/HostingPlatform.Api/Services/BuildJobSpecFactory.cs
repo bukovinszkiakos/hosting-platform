@@ -30,6 +30,12 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
     // Automatically remove finished Jobs to avoid accumulation (1 hour).
     private const int TtlSecondsAfterFinished = 3600;
 
+    // Kubernetes terminates the Job if the build exceeds this wall-clock limit
+    // (10 minutes, matching DeploymentBuildWorker.BuildTimeout). This guarantees a
+    // timed-out build cannot keep running and publish to S3/CloudFront after the
+    // deployment has already been marked Failed (docs/10-deployment-workflow.md).
+    private const long BuildDeadlineSeconds = 600;
+
     private readonly AwsSettings _aws;
 
     public BuildJobSpecFactory(IOptions<AwsSettings> aws)
@@ -84,6 +90,7 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
             {
                 BackoffLimit = BackoffLimit,
                 TtlSecondsAfterFinished = TtlSecondsAfterFinished,
+                ActiveDeadlineSeconds = BuildDeadlineSeconds,
                 Template = new V1PodTemplateSpec
                 {
                     Metadata = new V1ObjectMeta { Labels = labels },
@@ -93,6 +100,11 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
                         // Bound to the Backend Service IAM role via EKS Pod Identity, so
                         // the build script can upload to S3 and invalidate CloudFront.
                         ServiceAccountName = BuildJobNaming.ServiceAccountName,
+                        // The build container never calls the Kubernetes API, so the
+                        // default API token is not mounted (it would only be attack
+                        // surface for untrusted repo code). Pod Identity injects its own
+                        // token separately, so AWS access is unaffected.
+                        AutomountServiceAccountToken = false,
                         Containers = [container],
                     },
                 },

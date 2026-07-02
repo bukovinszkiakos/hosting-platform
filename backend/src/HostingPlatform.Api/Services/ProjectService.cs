@@ -52,6 +52,8 @@ public class ProjectService : IProjectService
             throw new ValidationException("Project name is required");
         }
 
+        ValidateRepositoryUrl(request.RepositoryUrl);
+
         var now = DateTime.UtcNow;
         var project = new Project
         {
@@ -78,6 +80,8 @@ public class ProjectService : IProjectService
         {
             throw new ValidationException("Project name is required");
         }
+
+        ValidateRepositoryUrl(request.RepositoryUrl);
 
         var project = await FindOwnedAsync(userId, projectId);
 
@@ -114,6 +118,23 @@ public class ProjectService : IProjectService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Project {ProjectId} deleted for user {UserId}", projectId, userId);
+    }
+
+    // The repository URL is optional at create/update (a deployment later requires
+    // one), but when provided it must be a well-formed absolute http(s) URL. This
+    // surfaces an obviously invalid URL immediately instead of at build time.
+    private static void ValidateRepositoryUrl(string? repositoryUrl)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryUrl))
+        {
+            return;
+        }
+
+        if (!Uri.TryCreate(repositoryUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ValidationException("Repository URL is invalid");
+        }
     }
 
     // Loads a project the user owns, or throws NotFound. Not-owned projects are

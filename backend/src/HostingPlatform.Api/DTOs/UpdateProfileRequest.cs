@@ -1,3 +1,7 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HostingPlatform.Api.DTOs;
 
-public record UpdateProfileRequest(string DisplayName, string Email);
+public record UpdateProfileRequest(
+    [StringLength(150)] string DisplayName,
+    string Email);

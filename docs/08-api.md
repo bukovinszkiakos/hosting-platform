@@ -229,6 +229,10 @@ POST /api/projects
 }
 ```
 
+`name` is required (≤ 150 chars). `repositoryUrl` is optional (≤ 2048 chars) but,
+when supplied, must be a valid absolute `http`/`https` URL; otherwise `400` is
+returned (`Repository URL is invalid`). The same rules apply to Update Project.
+
 ---
 
 # Update Project
@@ -286,6 +290,10 @@ POST /api/projects/{id}/deploy
   "status": "Pending"
 }
 ```
+
+Returns `400` if the project has no repository URL, or if a deployment for the
+project is already `Pending`, `Building` or `Deploying` (`A deployment is already
+in progress.`) — only one active deployment per project is allowed.
 
 ---
 
@@ -459,6 +467,17 @@ All error responses use the standardized shape defined in
 ```json
 {
   "message": "Resource not found",
+  "errors": []
+}
+```
+
+---
+
+# Deployment Already In Progress
+
+```json
+{
+  "message": "A deployment is already in progress.",
   "errors": []
 }
 ```

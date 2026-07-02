@@ -14,6 +14,7 @@ metadata:
 spec:
   backoffLimit: 0 # single attempt; a failed build becomes a Failed deployment (no retry)
   ttlSecondsAfterFinished: 3600 # auto-remove finished Jobs after 1 hour
+  activeDeadlineSeconds: 600 # Kubernetes terminates the build after 10 min so it cannot publish after the deployment is marked Failed
   template:
     metadata:
       labels:
@@ -24,6 +25,10 @@ spec:
       # Bound to the Backend Service IAM role via EKS Pod Identity, granting the
       # S3 + CloudFront access the build script needs (see k8s/base/serviceaccount.yaml).
       serviceAccountName: hosting-platform
+      # The build container never calls the Kubernetes API, so the default API token
+      # is not mounted (attack surface for untrusted repo code). Pod Identity injects
+      # its own token separately, so AWS access is unaffected.
+      automountServiceAccountToken: false
       containers:
         - name: build
           image: node:20-slim # git + AWS CLI v2 are installed at runtime below (docs/12 Build Environment)

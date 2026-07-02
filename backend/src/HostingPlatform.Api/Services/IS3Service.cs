@@ -8,9 +8,6 @@ public interface IS3Service
     // "{userId}/{projectId}/".
     string GetSiteKeyPrefix(Guid userId, Guid projectId);
 
-    // Uploads a single object to the shared site bucket under the given key.
-    Task UploadFileAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default);
-
     // Removes all published files for a project (every object under its
     // "{userId}/{projectId}/" prefix). Used when a project is deleted
     // (see docs/02-features.md "Delete Project").

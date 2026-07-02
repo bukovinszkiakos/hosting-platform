@@ -34,10 +34,55 @@ public class DeploymentBuildWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await RecoverInterruptedDeploymentsAsync(stoppingToken);
+
         await foreach (var deploymentId in _queue.DequeueAllAsync(stoppingToken))
         {
             await ProcessAsync(deploymentId, stoppingToken);
         }
+    }
+
+    // The in-memory queue does not survive a restart, so any deployment still in a
+    // non-terminal state belongs to a previous process that was interrupted (e.g. a
+    // pod restart) and can never make progress. Mark these Failed on startup rather
+    // than leave them stuck (see docs/10-deployment-workflow.md "Deployment
+    // Orchestration"). Interrupted deployments are not requeued.
+    private async Task RecoverInterruptedDeploymentsAsync(CancellationToken cancellationToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var provider = scope.ServiceProvider;
+        var db = provider.GetRequiredService<AppDbContext>();
+        var deployments = provider.GetRequiredService<IDeploymentService>();
+
+        var interruptedIds = await db.Deployments
+            .Where(d => d.Status == DeploymentStatus.Pending
+                     || d.Status == DeploymentStatus.Building
+                     || d.Status == DeploymentStatus.Deploying)
+            .Select(d => d.Id)
+            .ToListAsync(cancellationToken);
+
+        if (interruptedIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var deploymentId in interruptedIds)
+        {
+            try
+            {
+                await deployments.UpdateStatusAsync(
+                    deploymentId, DeploymentStatus.Failed,
+                    errorMessage: "Deployment interrupted by a service restart");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Could not recover interrupted deployment {DeploymentId}", deploymentId);
+            }
+        }
+
+        _logger.LogInformation(
+            "Recovered {Count} interrupted deployment(s) on startup", interruptedIds.Count);
     }
 
     private async Task ProcessAsync(Guid deploymentId, CancellationToken cancellationToken)
