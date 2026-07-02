@@ -6,6 +6,10 @@ metadata:
   labels:
     app: backend
 spec:
+  # Single replica for the MVP: the deployment queue is in-memory and per-pod and
+  # ASP.NET Data Protection keys are ephemeral, so multiple replicas would lose
+  # queued deployments and fail to share auth cookies. There is intentionally no
+  # backend HPA (see docs/07-kubernetes.md "Horizontal Pod Autoscaler").
   replicas: 1
   selector:
     matchLabels:
@@ -29,14 +33,16 @@ spec:
             - secretRef:
                 name: backend-secrets
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: 8080
             initialDelaySeconds: 20
             periodSeconds: 20

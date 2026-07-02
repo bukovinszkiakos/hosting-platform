@@ -83,6 +83,11 @@ builder.Services.AddScoped<ICloudFrontService, CloudFrontService>();
 
 builder.Services.AddControllers();
 
+// Minimal liveness/readiness signal. Mapped anonymously at /healthz below; used by
+// the Kubernetes probes and the ALB target-group health check (see
+// docs/07-kubernetes.md "Health Checks").
+builder.Services.AddHealthChecks();
+
 // Make automatic model validation / binding 400s return the documented
 // { message, errors[] } shape instead of the default RFC7807 ProblemDetails, so
 // the error contract is identical to ValidationException (see GlobalExceptionMiddleware
@@ -124,6 +129,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Anonymous health endpoint (no authentication) for Kubernetes probes and the ALB
+// health check. Returns 200 when the app is up.
+app.MapHealthChecks("/healthz").AllowAnonymous();
 
 app.MapControllers();
 

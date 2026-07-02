@@ -251,9 +251,12 @@ ingress/
 
 ```text id="n3lb77"
 hpa/
-├── frontend-hpa.yaml
-└── backend-hpa.yaml
+└── frontend-hpa.yaml
 ```
+
+> Only the frontend has an HPA. The backend runs as a single replica during the
+> MVP (in-memory queue + ephemeral Data Protection keys); see
+> `07-kubernetes.md` "Backend Replicas".
 
 ---
 

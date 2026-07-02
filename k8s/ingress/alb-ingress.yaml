@@ -6,6 +6,13 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
+    # HTTPS termination at the ALB. The backend issues Secure session cookies in
+    # Production, which browsers drop over plain HTTP, so the app must be served
+    # over HTTPS. This requires an ACM certificate (and therefore a domain); see
+    # docs/07-kubernetes.md "Ingress". The HTTP listener redirects to HTTPS.
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "REPLACE_WITH_ACM_CERTIFICATE_ARN"
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
 spec:
   ingressClassName: alb
   rules:

@@ -25,7 +25,9 @@ Namespace:
 hosting-platform
 ```
 
-All platform components run within this namespace.
+All platform components run within this namespace. The namespace itself is
+defined as a manifest (`k8s/base/namespace.yaml`) so the manifests are
+self-contained; apply it before the others.
 
 ---
 
@@ -35,16 +37,18 @@ The cluster contains the following main components:
 
 ```text
 hosting-platform
+├── Namespace
 ├── Frontend Deployment
 ├── Backend Deployment
 ├── Frontend Service
 ├── Backend Service
 ├── Build Jobs
 ├── ServiceAccount
+├── RBAC (Role + RoleBinding for the backend)
 ├── ConfigMaps
 ├── Secrets
 ├── Ingress
-└── HPA
+└── HPA (frontend only)
 ```
 
 ---
@@ -271,9 +275,33 @@ injects its own credential token separately, so AWS access is unaffected.
 > share this single service account and IAM role. Giving build Jobs a dedicated
 > service account and a minimal, build-only IAM role — ideally with per-project
 > session policies scoping S3 access to `{userId}/{projectId}/` — is a planned
-> future enhancement. It is deferred for the MVP because, without per-project
-> scoping, a separate build role (still bucket-wide) adds infrastructure for only
-> a marginal isolation gain.
+> future enhancement. It is deferred for the MVP because: (1) the main K8s risk
+> — untrusted build code inheriting the backend's Job-creation RBAC — is already
+> neutralized by `automountServiceAccountToken: false` (the build container has no
+> API token), and (2) without per-project scoping, a separate build role (still
+> bucket-wide) adds infrastructure for only a marginal AWS-isolation gain. The
+> dedicated build service account and role should be introduced together with the
+> per-project session policies.
+
+---
+
+# RBAC
+
+The backend drives the deployment pipeline through the Kubernetes API (creating
+build Jobs, reading Job status, listing build pods, reading pod logs), so the
+`hosting-platform` service account is granted a **namespaced Role + RoleBinding**
+(`k8s/base/rbac.yaml`) with only those permissions:
+
+```text
+batch/jobs   : create, get
+pods         : list
+pods/log     : get
+```
+
+No cluster-wide permissions and no delete are granted (finished Jobs are removed
+by `ttlSecondsAfterFinished`). Because build pods run with
+`automountServiceAccountToken: false`, untrusted build code cannot use these
+permissions.
 
 ---
 
@@ -288,6 +316,18 @@ to the `aws-load-balancer-controller` service account (`kube-system`) through an
 EKS Pod Identity association — the same approach as the backend service account,
 so no permissions are attached to the node group. The role's policy is pinned to
 a specific controller version, so install a matching controller version.
+
+## HTTPS
+
+The ALB terminates **HTTPS**, and the HTTP listener redirects to it
+(`listen-ports` + `ssl-redirect` annotations). This is required, not optional:
+the backend runs in Production mode and issues `Secure` session cookies, which
+browsers drop over plain HTTP — so serving the app over HTTP would silently break
+authentication. HTTPS on the ALB needs an **ACM certificate** (and therefore a
+domain), supplied via the `certificate-arn` annotation. This makes a domain + ACM
+a production prerequisite for the application endpoint (published sites already
+get HTTPS via CloudFront). Custom domains were previously listed as a future item;
+for the app's own endpoint HTTPS is required.
 
 ## Architecture
 
@@ -304,9 +344,27 @@ Service    Service
 
 ---
 
+# Health Checks
+
+The backend exposes an anonymous `GET /healthz` endpoint (ASP.NET Core health
+checks) that returns 200 when the app is up. It is used by two independent
+checkers:
+
+* **Kubernetes probes** — the backend's readiness and liveness probes are HTTP
+  `GET /healthz` (not bare TCP), so a pod is only considered healthy once the app
+  actually responds.
+* **ALB target-group health check** — the backend has no `/` route, so the ALB's
+  default `/` health check would fail and the target group would return `503`.
+  The backend Service sets `alb.ingress.kubernetes.io/healthcheck-path: /healthz`
+  so the ALB checks the right endpoint.
+
+The frontend serves `/` (200), so it keeps TCP probes and the ALB default check.
+
+---
+
 # Horizontal Pod Autoscaler
 
-Both frontend and backend deployments use HPA.
+Only the **frontend** uses an HPA. The frontend is stateless and scales freely.
 
 ## Responsibilities
 
@@ -324,12 +382,20 @@ Max Replicas: 3
 
 ---
 
-# Backend HPA
+# Backend Replicas
 
-```text
-Min Replicas: 1
-Max Replicas: 3
-```
+The backend runs as a **single replica** with **no HPA** during the MVP. Its
+deployment queue is in-memory and per-pod, and its ASP.NET Core Data Protection
+keys are ephemeral, so multiple replicas would:
+
+* lose deployments queued on a pod that scales down, and
+* be unable to decrypt each other's authentication cookies.
+
+A backend HPA (and multi-replica operation) should be re-enabled only once the
+deployment queue is durable and Data Protection keys are persisted (see
+"MVP Limitations" in `10-deployment-workflow.md`). A single-replica restart still
+logs users out (ephemeral keys) and marks any in-flight deployment `Failed` via
+startup recovery — accepted MVP trade-offs.
 
 ---
 
@@ -339,14 +405,14 @@ Max Replicas: 3
 
 ```text
 Frontend: 1 Replica
-Backend: 1 Replica
+Backend: 1 Replica (fixed)
 ```
 
 ## High Load
 
 ```text
-Frontend: 3 Replicas
-Backend: 3 Replicas
+Frontend: up to 3 Replicas
+Backend: 1 Replica (fixed until durable queue + persisted keys)
 ```
 
 ---
@@ -373,3 +439,12 @@ Future versions may include:
 * Multiple Namespaces
 * Multi-Tenant Architecture
 * Advanced Autoscaling
+* **Pod security hardening** for the app pods (`runAsNonRoot`,
+  `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem`). Deferred because
+  it must be validated against the actual (not-yet-built) container images — a
+  read-only root or forced non-root user can prevent a pod from starting — and
+  build containers legitimately need to write and install packages at runtime.
+* **Dedicated build service account + per-project IAM session policies** (see
+  "Service Account and AWS Access").
+* **Durable deployment queue + persisted Data Protection keys**, which together
+  allow re-enabling a backend HPA / multi-replica backend.

@@ -1,0 +1,39 @@
+# Namespaced RBAC for the backend, which drives the deployment pipeline through
+# the Kubernetes API (see backend Services/KubernetesJobService.cs). The
+# permissions are the minimum the backend actually uses:
+#   * create/read build Jobs           (CreateNamespacedJob, ReadNamespacedJob)
+#   * list build pods                   (ListNamespacedPod)
+#   * read build pod logs               (ReadNamespacedPodLog)
+#
+# Bound to the platform ServiceAccount. Build Jobs run under a pod spec with
+# automountServiceAccountToken=false (see BuildJobSpecFactory), so untrusted build
+# code has no API token and cannot use these permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backend-build-jobs
+  namespace: hosting-platform
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backend-build-jobs
+  namespace: hosting-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: backend-build-jobs
+subjects:
+  - kind: ServiceAccount
+    name: hosting-platform
+    namespace: hosting-platform

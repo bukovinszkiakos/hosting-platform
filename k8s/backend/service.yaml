@@ -5,6 +5,12 @@ metadata:
   namespace: hosting-platform
   labels:
     app: backend
+  annotations:
+    # ALB target-group health check for the backend (the AWS Load Balancer
+    # Controller reads these per-Service). The backend has no "/" route, so the
+    # default health check path would fail; point it at the anonymous /healthz.
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
 spec:
   type: ClusterIP
   selector:

@@ -1,0 +1,6 @@
+# The single platform namespace (see docs/07-kubernetes.md "Namespace Strategy").
+# Defined here so the manifests are self-contained; apply this before the others.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hosting-platform
