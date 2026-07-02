@@ -49,3 +49,15 @@ variable "service_account_name" {
   description = "Kubernetes service account bound to the backend role via Pod Identity."
   default     = "hosting-platform"
 }
+
+variable "alb_controller_service_account_namespace" {
+  type        = string
+  description = "Namespace of the AWS Load Balancer Controller service account (Helm installs it in kube-system by default)."
+  default     = "kube-system"
+}
+
+variable "alb_controller_service_account_name" {
+  type        = string
+  description = "Service account name of the AWS Load Balancer Controller, bound to its role via Pod Identity."
+  default     = "aws-load-balancer-controller"
+}

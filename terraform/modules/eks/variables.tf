@@ -30,12 +30,23 @@ variable "private_subnet_ids" {
 
 variable "kubernetes_version" {
   type        = string
-  description = "Kubernetes version for the EKS cluster."
-  default     = "1.31"
+  description = "Kubernetes version for the EKS cluster. Keep on an EKS standard-support release to avoid extended-support pricing; verify the current standard-support range at deploy time."
+  default     = "1.34"
 
   validation {
     condition     = can(regex("^1\\.[0-9]+$", var.kubernetes_version))
-    error_message = "kubernetes_version must look like '1.31'."
+    error_message = "kubernetes_version must look like '1.34'."
+  }
+}
+
+variable "cluster_endpoint_public_access_cidrs" {
+  type        = list(string)
+  description = "CIDR blocks allowed to reach the public Kubernetes API endpoint. Defaults to open; restrict to trusted administration locations in production."
+  default     = ["0.0.0.0/0"]
+
+  validation {
+    condition     = length(var.cluster_endpoint_public_access_cidrs) > 0
+    error_message = "cluster_endpoint_public_access_cidrs must contain at least one CIDR block."
   }
 }
 

@@ -124,3 +124,20 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
+
+# S3 Gateway VPC Endpoint: routes S3 traffic (e.g. build jobs running `aws s3
+# sync`) directly to S3 via the private route table instead of through the NAT
+# Gateway. Gateway endpoints are free, so this reduces NAT data-processing cost
+# with no ongoing charge (CLAUDE.md priority: AWS cost optimization).
+data "aws_region" "current" {}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private.id]
+
+  tags = {
+    Name = "${var.name_prefix}-s3-endpoint"
+  }
+}

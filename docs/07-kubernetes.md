@@ -281,6 +281,14 @@ injects its own credential token separately, so AWS access is unaffected.
 
 The platform publishes applications using the AWS ALB Ingress Controller.
 
+The **AWS Load Balancer Controller** must be installed in the cluster (via Helm,
+at deploy time) for the Ingress to provision an Application Load Balancer. Its
+IAM permissions are provisioned by Terraform (IAM module): a dedicated role bound
+to the `aws-load-balancer-controller` service account (`kube-system`) through an
+EKS Pod Identity association — the same approach as the backend service account,
+so no permissions are attached to the node group. The role's policy is pinned to
+a specific controller version, so install a matching controller version.
+
 ## Architecture
 
 ```text

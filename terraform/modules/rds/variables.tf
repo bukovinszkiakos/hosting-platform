@@ -112,3 +112,21 @@ variable "skip_final_snapshot" {
   description = "Skip the final snapshot on deletion. True for dev; production should set this to false."
   default     = true
 }
+
+variable "deletion_protection" {
+  type        = bool
+  description = "Prevent the database from being deleted. Disabled for dev; production should enable it."
+  default     = false
+}
+
+variable "final_snapshot_identifier" {
+  type        = string
+  description = "Name of the final snapshot taken on deletion. Required when skip_final_snapshot is false (production)."
+  default     = null
+}
+
+variable "max_allocated_storage" {
+  type        = number
+  description = "Upper limit (GiB) for RDS storage autoscaling. null disables autoscaling (dev); production sets a cap above allocated_storage."
+  default     = null
+}

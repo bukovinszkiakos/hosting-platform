@@ -19,14 +19,3 @@ variable "bucket_name" {
     error_message = "bucket_name must be a valid S3 bucket name (lowercase letters, numbers, hyphens)."
   }
 }
-
-variable "dynamodb_table_name" {
-  type        = string
-  description = "Name of the DynamoDB table for Terraform state locking"
-  default     = "hosting-platform-tfstate-lock"
-
-  validation {
-    condition     = length(var.dynamodb_table_name) > 0
-    error_message = "dynamodb_table_name must not be empty."
-  }
-}

@@ -68,6 +68,14 @@ resource "aws_eks_cluster" "this" {
 
   vpc_config {
     subnet_ids = var.private_subnet_ids
+
+    # Enable the private API endpoint so in-VPC traffic reaches the API server
+    # privately. The public endpoint stays enabled so administrators can run
+    # kubectl/helm during deployment; restrict public_access_cidrs to trusted
+    # locations in production (defaults to open — see variables).
+    endpoint_private_access = true
+    endpoint_public_access  = true
+    public_access_cidrs     = var.cluster_endpoint_public_access_cidrs
   }
 
   # The cluster policy must be attached before the cluster is created.

@@ -7,14 +7,14 @@ and `docs/06-terraform.md`).
 
 ```text
 terraform/
-├── backend/                 # Remote state bootstrap: S3 bucket + DynamoDB lock table
+├── backend/                 # Remote state bootstrap: S3 state bucket (S3 native locking, no DynamoDB)
 ├── modules/                 # Reusable modules
 │   ├── vpc/                 # VPC, public/private subnets, IGW, NAT, route tables
 │   ├── eks/                 # EKS cluster, managed node group, cluster/node IAM roles, Pod Identity Agent addon
 │   ├── rds/                 # PostgreSQL, subnet group, security group
 │   ├── s3/                  # Static-site hosting bucket + public-read policy
 │   ├── cloudfront/          # CDN/HTTPS distribution + index.html rewrite function
-│   └── iam/                 # Backend service IAM role (S3 + CloudFront, least privilege) + Pod Identity association
+│   └── iam/                 # Backend + ALB Controller IAM roles (least privilege) + Pod Identity associations
 └── environments/
     ├── dev/                 # Cost-minimized development environment
     └── prod/                # Production-sized environment
@@ -29,7 +29,7 @@ Both environments compose the same modules; they differ only in variables:
 | VPC CIDR             | `10.0.0.0/16`        | `10.1.0.0/16`         |
 | Availability Zones   | 2                    | 3                     |
 | EKS nodes            | 1–3 × `t3.medium`    | 2–5 × `t3.large`      |
-| RDS                  | `db.t3.micro`, single-AZ, 1-day backups, no final snapshot | `db.t3.small`, Multi-AZ, 7-day backups, final snapshot |
+| RDS                  | `db.t3.micro`, single-AZ, 1-day backups, no final snapshot | `db.t3.small`, Multi-AZ, 7-day backups, final snapshot, deletion protection, storage autoscaling |
 | CloudFront price     | `PriceClass_100`     | `PriceClass_All`      |
 
 ## Deploy
@@ -48,7 +48,7 @@ AWS S3 — adjust it if the default name is taken.
 ```bash
 cd terraform/backend
 terraform init
-terraform apply        # creates the S3 state bucket + DynamoDB lock table
+terraform apply        # creates the S3 state bucket (state locking uses S3 use_lockfile)
 ```
 
 ### 2. Enable the S3 backend

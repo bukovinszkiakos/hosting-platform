@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.10"
+  required_version = ">= 1.11"
 
   required_providers {
     aws = {
@@ -8,13 +8,15 @@ terraform {
     }
   }
 
-  # Uncomment after backend resources are provisioned (see terraform/backend/)
+  # Uncomment after backend resources are provisioned (see terraform/backend/).
+  # use_lockfile enables S3 native state locking (Terraform >= 1.11), so no
+  # DynamoDB table is required (see docs/06-terraform.md "Remote State").
   # backend "s3" {
-  #   bucket         = "hosting-platform-tfstate"
-  #   key            = "prod/terraform.tfstate"
-  #   region         = "eu-central-1"
-  #   dynamodb_table = "hosting-platform-tfstate-lock"
-  #   encrypt        = true
+  #   bucket       = "hosting-platform-tfstate"
+  #   key          = "prod/terraform.tfstate"
+  #   region       = "eu-central-1"
+  #   use_lockfile = true
+  #   encrypt      = true
   # }
 }
 
@@ -68,11 +70,14 @@ module "rds" {
   db_password         = var.db_password
 
   # Production durability/availability (dev relies on the cheaper defaults).
-  instance_class          = "db.t3.small"
-  allocated_storage       = 50
-  backup_retention_period = 7
-  multi_az                = true
-  skip_final_snapshot     = false
+  instance_class            = "db.t3.small"
+  allocated_storage         = 50
+  max_allocated_storage     = 100
+  backup_retention_period   = 7
+  multi_az                  = true
+  deletion_protection       = true
+  skip_final_snapshot       = false
+  final_snapshot_identifier = "${local.name_prefix}-final"
 }
 
 module "s3" {

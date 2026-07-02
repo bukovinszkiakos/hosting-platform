@@ -36,8 +36,6 @@ AWS
 │
 ├── IAM
 │
-├── DynamoDB
-│
 └── Terraform State Bucket
 ```
 
@@ -218,6 +216,11 @@ Examples:
 
 Kubernetes Build Jobs access external services through the NAT Gateway.
 
+An S3 **Gateway VPC Endpoint** routes S3 traffic (for example a build job's
+`aws s3 sync`) directly to S3 via the private route table instead of through the
+NAT Gateway. Gateway endpoints are free, so this reduces NAT data-processing cost
+with no additional charge.
+
 ---
 
 # IAM
@@ -237,6 +240,11 @@ The Backend Service Role (S3 + CloudFront access) is granted to pods through an
 account, which the backend and the build Jobs run under. The node group role
 carries no S3 or CloudFront permissions.
 
+The **AWS Load Balancer Controller** role is granted the same way: a Pod Identity
+association with the `aws-load-balancer-controller` service account (in
+`kube-system`) gives the controller the permissions it needs to provision the
+ALB for the Ingress. The controller itself is installed at deploy time (Helm).
+
 ---
 
 # Terraform Backend
@@ -247,11 +255,9 @@ Terraform state is not stored locally.
 
 ### S3 Bucket
 
-Stores Terraform state files.
-
-### DynamoDB Table
-
-Provides state locking functionality.
+Stores Terraform state files. State locking uses S3 native locking
+(`use_lockfile`, Terraform >= 1.11), so no separate DynamoDB lock table is
+required.
 
 This ensures safe Terraform operations.
 

@@ -88,3 +88,51 @@ resource "aws_eks_pod_identity_association" "backend" {
     Name = "${var.name_prefix}-backend"
   }
 }
+
+# ---------------------------------------------------------------------------
+# AWS Load Balancer Controller role
+# ---------------------------------------------------------------------------
+# The ALB Ingress (k8s/ingress/alb-ingress.yaml) is provisioned by the AWS Load
+# Balancer Controller, which needs IAM permissions to create/manage ALBs, target
+# groups and listeners. Same architecture as the backend role: Pod Identity binds
+# this role to the controller's service account (kube-system/aws-load-balancer-
+# controller), so nothing is granted to the node role.
+#
+# The controller itself is installed at deploy time (Helm); this only provisions
+# its IAM prerequisites. alb-controller-iam-policy.json is the official policy for
+# the pinned controller version (see docs/07-kubernetes.md) and must be kept in
+# sync with the installed controller version.
+
+resource "aws_iam_role" "alb_controller" {
+  name = "${var.name_prefix}-alb-controller"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "pods.eks.amazonaws.com" }
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+    }]
+  })
+
+  tags = {
+    Name = "${var.name_prefix}-alb-controller"
+  }
+}
+
+resource "aws_iam_role_policy" "alb_controller" {
+  name   = "${var.name_prefix}-alb-controller"
+  role   = aws_iam_role.alb_controller.id
+  policy = file("${path.module}/alb-controller-iam-policy.json")
+}
+
+resource "aws_eks_pod_identity_association" "alb_controller" {
+  cluster_name    = var.eks_cluster_name
+  namespace       = var.alb_controller_service_account_namespace
+  service_account = var.alb_controller_service_account_name
+  role_arn        = aws_iam_role.alb_controller.arn
+
+  tags = {
+    Name = "${var.name_prefix}-alb-controller"
+  }
+}

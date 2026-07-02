@@ -143,13 +143,19 @@ Terraform state is not stored locally.
 Purpose:
 
 * Store Terraform state files.
+* State locking via S3 native locking (`use_lockfile`, Terraform >= 1.11), which
+  prevents concurrent modifications without a separate DynamoDB table.
 
-## DynamoDB Lock
+## Enablement Sequence
 
-Purpose:
+Remote state must be enabled before the first production apply (otherwise state,
+including the RDS password, stays in a local file with no locking). Because the
+backend bucket must exist before it can hold state:
 
-* State locking
-* Preventing concurrent modifications
+1. `terraform apply` the `terraform/backend/` config with local state to create
+   the state bucket.
+2. Uncomment the `backend "s3"` block in each environment (`use_lockfile = true`).
+3. Run `terraform init -migrate-state` to move local state into S3.
 
 ---
 
@@ -163,6 +169,7 @@ Purpose:
 * Create Internet Gateway
 * Create NAT Gateway
 * Create Route Tables
+* Create an S3 Gateway VPC Endpoint (free; keeps S3 traffic off the NAT Gateway)
 
 ## Outputs
 
@@ -180,6 +187,12 @@ Purpose:
 * Create Managed Node Group
 * Create Cluster IAM Roles
 * Enable the EKS Pod Identity Agent addon
+
+The API endpoint has both private and public access enabled. `kubernetes_version`
+defaults to an EKS standard-support release (currently `1.34`) to avoid
+extended-support pricing; verify the standard-support range at deploy time.
+`cluster_endpoint_public_access_cidrs` (default open) should be restricted to
+trusted administration locations in production.
 
 ## Inputs
 
@@ -201,6 +214,11 @@ Purpose:
 * Create PostgreSQL Database
 * Create Subnet Group
 * Create Security Group
+
+Production hardening is available through variables (wired in the prod
+environment): `deletion_protection`, `final_snapshot_identifier` (required when
+`skip_final_snapshot = false`), and `max_allocated_storage` (storage autoscaling
+cap). Dev leaves these at their cheaper defaults.
 
 ## Outputs
 
@@ -252,6 +270,11 @@ Purpose:
 * Backend Service IAM Role (S3 + CloudFront, least privilege)
 * EKS Pod Identity association binding that role to the `hosting-platform`
   Kubernetes service account
+* AWS Load Balancer Controller IAM Role + Pod Identity association (bound to the
+  `aws-load-balancer-controller` service account in `kube-system`), so the
+  controller can provision the ALB for the Ingress. Its policy is the official
+  controller policy (`alb-controller-iam-policy.json`, pinned to controller
+  v3.4.0) and must be kept in sync with the installed controller version.
 
 (The EKS cluster and node-group IAM roles are created in the EKS module, since
 a cluster cannot be created without them.)
@@ -302,3 +325,11 @@ Future versions may include:
 * CloudWatch
 * Advanced Auto Scaling
 * Multi-Region AWS Support
+* **RDS security group scoped to the EKS security group** instead of the VPC
+  CIDR (tighter than the current private-subnet + VPC-CIDR isolation; deferred to
+  avoid cross-module coupling for marginal MVP benefit).
+* **CloudFront Origin Access Control (OAC)** to lock the S3 bucket to CloudFront
+  only. Deferred because the hosted content is intentionally public static sites,
+  so OAC's benefit is marginal for the MVP.
+* **Highly available NAT** (one NAT Gateway per AZ) for production resilience;
+  the MVP uses a single NAT Gateway for cost.
