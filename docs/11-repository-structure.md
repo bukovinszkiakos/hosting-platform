@@ -52,7 +52,8 @@ docs/
 ├── 12-technical-decisions-and-conventions.md
 ├── 13-implementation-task-sequence.md
 ├── 14-post-mvp-polish.md
-└── 15-demo.md
+├── 15-demo.md
+└── 16-deployment.md
 ```
 
 ---
@@ -278,7 +279,8 @@ scripts/
 ```text id="xvvgqx"
 .github/
 └── workflows/
-    └── ci.yml
+    ├── ci.yml       # build/lint/validate on every push + PR
+    └── deploy.yml   # manual (workflow_dispatch) application deploy to EKS
 ```
 
 ---
@@ -299,6 +301,10 @@ kubernetes   -> kubeconform schema validation of k8s/ (no cluster needed)
 
 Any failing step fails its job and the overall check. See `docs/07-kubernetes.md`
 for what Kubernetes validation can and cannot cover without a cluster.
+
+Deployment is a **separate, manual** workflow (`deploy.yml`, `workflow_dispatch`)
+— CI never deploys. See `docs/16-deployment.md` for the deployment process,
+required secrets, order, bootstrap requirements, rollback, and limitations.
 
 ---
 

@@ -1,0 +1,158 @@
+name: Deploy (manual)
+
+# Manual-only Continuous Deployment — NEVER triggered automatically.
+#
+# Scope: deploy the application to an ALREADY-PROVISIONED EKS cluster (apply the
+# Kubernetes manifests and wait for the rollout). Infrastructure provisioning
+# (`terraform apply`), container image build/push, the AWS Load Balancer Controller
+# install, the ACM certificate, the ConfigMap/Secret, and database migrations are
+# one-time bootstrap steps performed manually — see docs/16-deployment.md. This
+# keeps the automated path safe and idempotent and avoids running state-sensitive
+# `terraform apply` from an ephemeral runner.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        options: [dev, prod]
+        default: dev
+      backend_image:
+        description: "Backend image URI (e.g. <acct>.dkr.ecr.<region>.amazonaws.com/hosting-platform-backend:<tag>)"
+        type: string
+        required: true
+      frontend_image:
+        description: "Frontend image URI"
+        type: string
+        required: true
+
+# Never run two deployments to the same environment at once, and never cancel a
+# deployment that is already in flight.
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Uses a GitHub Environment so secrets can be scoped and protection rules
+    # (e.g. required reviewers) can gate production. Created on first use if absent.
+    environment: ${{ inputs.environment }}
+    env:
+      NAMESPACE: hosting-platform
+      CLUSTER_NAME: hosting-platform-${{ inputs.environment }}-eks
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "$AWS_ACCESS_KEY_ID" ]     || missing+=("AWS_ACCESS_KEY_ID")
+          [ -n "$AWS_SECRET_ACCESS_KEY" ] || missing+=("AWS_SECRET_ACCESS_KEY")
+          [ -n "$AWS_REGION" ]            || missing+=("AWS_REGION")
+          [ -n "$ACM_CERTIFICATE_ARN" ]   || missing+=("ACM_CERTIFICATE_ARN")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required secrets: ${missing[*]} (see docs/16-deployment.md)"
+            exit 1
+          fi
+          echo "All required secrets are present."
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          set -euo pipefail
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl config current-context
+
+      - name: Apply base resources (namespace, service account, RBAC)
+        run: |
+          set -euo pipefail
+          kubectl apply -f k8s/base/namespace.yaml
+          kubectl apply -f k8s/base/serviceaccount.yaml
+          kubectl apply -f k8s/base/rbac.yaml
+
+      - name: Verify bootstrap ConfigMap and Secret exist
+        run: |
+          set -euo pipefail
+          # These carry environment-specific (Terraform outputs) and sensitive
+          # (DB connection string) values and are created once during bootstrap
+          # (see docs/16-deployment.md). Fail early rather than roll out pods that
+          # would crash-loop on missing configuration.
+          for res in configmap/backend-config configmap/frontend-config secret/backend-secrets; do
+            if ! kubectl -n "$NAMESPACE" get "$res" >/dev/null 2>&1; then
+              echo "::error::Missing $res in $NAMESPACE. Create it during bootstrap (see docs/16-deployment.md, k8s/base/configmap.example.yaml, k8s/secrets/secret.example.yaml)."
+              exit 1
+            fi
+          done
+          echo "ConfigMap and Secret are present."
+
+      - name: Deploy services and workloads
+        env:
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+        run: |
+          set -euo pipefail
+          kubectl apply -f k8s/backend/service.yaml
+          kubectl apply -f k8s/frontend/service.yaml
+          # The Deployment manifests carry image: "PLACEHOLDER" (images are built
+          # and pushed manually — see docs/16-deployment.md). Substitute the URIs
+          # supplied as workflow inputs. '#' is the sed delimiter since image URIs
+          # contain '/' and ':'.
+          sed "s#image: \"PLACEHOLDER\".*#image: \"${BACKEND_IMAGE}\"#" k8s/backend/deployment.yaml | kubectl apply -f -
+          sed "s#image: \"PLACEHOLDER\".*#image: \"${FRONTEND_IMAGE}\"#" k8s/frontend/deployment.yaml | kubectl apply -f -
+          kubectl apply -f k8s/hpa/frontend-hpa.yaml
+
+      - name: Wait for rollout
+        run: |
+          set -euo pipefail
+          kubectl -n "$NAMESPACE" rollout status deployment/backend  --timeout=180s
+          kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=180s
+
+      - name: Apply ingress
+        env:
+          ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+        run: |
+          set -euo pipefail
+          # Applied after a healthy rollout so the ALB registers healthy targets.
+          # The manifest keeps a placeholder cert ARN in the repo; inject the real
+          # one from the secret at apply time.
+          sed "s#REPLACE_WITH_ACM_CERTIFICATE_ARN#${ACM_CERTIFICATE_ARN}#" k8s/ingress/alb-ingress.yaml | kubectl apply -f -
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Deployment summary"
+            echo "- Environment: \`${{ inputs.environment }}\`"
+            echo "- Cluster: \`$CLUSTER_NAME\`"
+            echo "- Backend image: \`${{ inputs.backend_image }}\`"
+            echo "- Frontend image: \`${{ inputs.frontend_image }}\`"
+            echo ""
+            echo '```'
+            kubectl -n "$NAMESPACE" get deploy,svc,ingress 2>/dev/null || echo "(cluster state unavailable)"
+            echo '```'
+            alb="$(kubectl -n "$NAMESPACE" get ingress hosting-platform -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+            if [ -n "$alb" ]; then
+              echo "- ALB hostname: \`$alb\`"
+            else
+              echo "- ALB hostname: still provisioning — check \`kubectl -n $NAMESPACE get ingress\` shortly."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -113,5 +113,16 @@ every push and pull request, as four parallel jobs: **backend** (restore +
 build), **frontend** (ESLint + `tsc --noEmit` + build), **terraform** (`fmt
 -check` + `validate` for the backend/dev/prod configs), and **kubernetes**
 (`kubeconform` schema validation of `k8s/`). NuGet and npm downloads are cached.
-CI is build/validate only — deploying to AWS is a separate, manually triggered
-workflow (not yet implemented).
+CI is build/validate only. Deployment is a separate, **manual** workflow.
+
+## Deployment
+
+Deploying to AWS is a manual (`workflow_dispatch`) workflow
+([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) that applies the
+Kubernetes manifests to an already-provisioned EKS cluster and waits for the
+rollout. Provisioning infrastructure (`terraform apply`), building/pushing images,
+installing the AWS Load Balancer Controller, the ACM certificate, the
+ConfigMap/Secret, and database migrations are one-time **manual bootstrap** steps.
+See [`docs/16-deployment.md`](docs/16-deployment.md) for the full process,
+required GitHub Secrets, deployment order, bootstrap requirements, rollback, and
+limitations.
