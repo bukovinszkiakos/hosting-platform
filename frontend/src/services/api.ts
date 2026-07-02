@@ -45,6 +45,15 @@ export interface Deployment {
   errorMessage: string | null;
 }
 
+// A deployment is "active" while it is still in progress. Terminal statuses are
+// "Online" and "Failed" (see docs/10-deployment-workflow.md "Deployment Status
+// Lifecycle"). Used to drive live polling and to disable the Deploy button.
+const ACTIVE_DEPLOYMENT_STATUSES = ["Pending", "Building", "Deploying"];
+
+export function isDeploymentActive(status: string): boolean {
+  return ACTIVE_DEPLOYMENT_STATUSES.includes(status);
+}
+
 export interface DeploymentLog {
   message: string;
   createdAt: string;
@@ -129,6 +138,15 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+// Handler invoked whenever a request fails with 401 Unauthorized, so session
+// expiry is handled centrally: the AuthProvider registers it to clear the cached
+// user, and ProtectedRoute then redirects to /login (see docs/12 "Error Handling").
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
 async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, signal } = options;
 
@@ -145,7 +163,13 @@ async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<
   });
 
   if (!response.ok) {
-    throw await toApiError(response);
+    const error = await toApiError(response);
+    // A 401 means the session cookie is missing or expired; notify the central
+    // handler so auth state is refreshed and the user is redirected to login.
+    if (error.status === 401) {
+      onUnauthorized?.();
+    }
+    throw error;
   }
 
   if (response.status === 204) {

@@ -4,10 +4,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ExternalLink, FolderGit2, GitBranch, Plus } from "lucide-react";
 
-import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -26,7 +25,6 @@ export default function ProjectsPage() {
 }
 
 function ProjectsView() {
-  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +64,7 @@ function ProjectsView() {
   }
 
   return (
-    <AppShell isAdmin={user?.role === "Admin"}>
+    <AppShell>
       <PageHeader
         title="Projects"
         description="Manage the websites you deploy from GitHub."
@@ -316,7 +314,7 @@ function ProjectCard({
             <>
               <Link
                 href={`/projects/${project.id}`}
-                className={buttonLinkClass}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
               >
                 Open
               </Link>
@@ -340,10 +338,6 @@ function ProjectCard({
     </Card>
   );
 }
-
-// A link styled like a small outline button (Link can't use the Button primitive).
-const buttonLinkClass =
-  "inline-flex h-8 items-center rounded-[min(var(--radius-md),12px)] border border-border bg-background px-3 text-[0.8rem] font-medium shadow-xs transition-colors hover:bg-muted";
 
 function ProjectListSkeleton() {
   return (

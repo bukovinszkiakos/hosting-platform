@@ -82,7 +82,7 @@ function AdminView() {
 
   if (user && !isAdmin) {
     return (
-      <AppShell isAdmin={false}>
+      <AppShell>
         <Card className="flex flex-col items-center gap-3 p-12 text-center">
           <span className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
             <ShieldX className="size-7" />
@@ -102,7 +102,7 @@ function AdminView() {
   const failedDeployments = deployments.filter((d) => d.status === "Failed").length;
 
   return (
-    <AppShell isAdmin>
+    <AppShell>
       <PageHeader
         title="Admin"
         description="Platform-wide users, projects, and deployment statistics."

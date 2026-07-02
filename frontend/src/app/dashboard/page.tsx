@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { CircleCheck, CircleX, FolderGit2, LineChart, Rocket } from "lucide-react";
 
-import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
@@ -22,7 +21,6 @@ export default function DashboardPage() {
 }
 
 function DashboardView() {
-  const { user } = useAuth();
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +49,7 @@ function DashboardView() {
   }, []);
 
   return (
-    <AppShell isAdmin={user?.role === "Admin"}>
+    <AppShell>
       <PageHeader
         title="Dashboard"
         description="An overview of your projects and deployments."

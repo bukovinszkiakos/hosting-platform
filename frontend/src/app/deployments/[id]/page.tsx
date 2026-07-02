@@ -5,13 +5,21 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Rocket, Terminal, TriangleAlert } from "lucide-react";
 
-import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { api, ApiError, type Deployment, type DeploymentLog } from "@/services/api";
+import {
+  api,
+  ApiError,
+  isDeploymentActive,
+  type Deployment,
+  type DeploymentLog,
+} from "@/services/api";
+
+// How often an in-progress deployment is refreshed (see finding: live updates).
+const POLL_INTERVAL_MS = 5000;
 
 export default function DeploymentDetailsPage() {
   return (
@@ -22,7 +30,6 @@ export default function DeploymentDetailsPage() {
 }
 
 function DeploymentDetailsView() {
-  const { user } = useAuth();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -59,8 +66,40 @@ function DeploymentDetailsView() {
     return () => controller.abort();
   }, [id]);
 
+  // Live updates: while the deployment is still in progress, refresh it and its
+  // logs on an interval, and stop automatically once it reaches a terminal state
+  // (Online/Failed). Poll errors are ignored so a transient failure does not
+  // clobber the current view; a 401 is still handled centrally by apiFetch.
+  const isActive = deployment ? isDeploymentActive(deployment.status) : false;
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const interval = setInterval(() => {
+      Promise.all([
+        api.deployments.get(id, controller.signal),
+        api.deployments.logs(id, controller.signal),
+      ])
+        .then(([deploymentData, logData]) => {
+          setDeployment(deploymentData);
+          setLogs(logData);
+        })
+        .catch(() => {
+          // Ignore transient poll errors; the next tick retries.
+        });
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
+  }, [id, isActive]);
+
   return (
-    <AppShell isAdmin={user?.role === "Admin"}>
+    <AppShell>
       <div className="mx-auto w-full max-w-5xl">
         <Link
           href="/projects"

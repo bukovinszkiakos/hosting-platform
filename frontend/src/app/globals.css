@@ -255,3 +255,17 @@
 @utility animate-fade-in {
   animation: fadeIn 0.4s ease both;
 }
+
+/* Accessibility: honour the OS "reduce motion" preference by neutralising
+   animations and transitions (entrances, hover lifts, spinners, the status
+   pulse). Colour and layout still convey state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

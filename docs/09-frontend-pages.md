@@ -357,6 +357,11 @@ Edit
 Delete
 ```
 
+The **Deploy** button is disabled while a deployment for the project is still in
+progress (current status `Pending`, `Building` or `Deploying`). This complements
+the backend guard that rejects concurrent deployments (see
+`10-deployment-workflow.md` "One Active Deployment Per Project").
+
 ---
 
 # Deployment Details Page
@@ -368,6 +373,11 @@ Delete
 ```
 
 Displays deployment details.
+
+While the deployment is in a non-terminal state (`Pending`, `Building`,
+`Deploying`), the page refreshes the deployment and its build logs every ~5
+seconds and stops polling automatically once it reaches a terminal state
+(`Online` or `Failed`), so status and logs update without a manual reload.
 
 ---
 
@@ -523,7 +533,9 @@ Page Content
 ```
 
 * **Sidebar** (desktop, `md+`): brand, the navigation items above, and a footer
-  showing the signed-in user (name + email) with a **Log out** button.
+  showing the signed-in user (name + email) with a **Log out** button. The
+  admin-only navigation item is shown based on the authenticated user's role read
+  from the auth context (the single source of truth), not passed down per page.
 * **Top Navigation**: shows the signed-in user's name. On small screens (where the
   sidebar is hidden) it also provides a menu button that opens the navigation
   items and **Log out**, so the app is fully usable on mobile.

@@ -9,7 +9,13 @@ import {
   type ReactNode,
 } from "react";
 
-import { api, ApiError, type CurrentUser, type LoginRequest } from "@/services/api";
+import {
+  api,
+  ApiError,
+  setUnauthorizedHandler,
+  type CurrentUser,
+  type LoginRequest,
+} from "@/services/api";
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -51,6 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await api.auth.logout();
     setUser(null);
+  }, []);
+
+  // Handle session expiry centrally: any API 401 clears the cached user, which
+  // lets ProtectedRoute redirect to /login even if the session expires mid-use.
+  useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   // Restore the user on first load so authentication persists across reloads.

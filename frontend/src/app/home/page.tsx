@@ -76,7 +76,7 @@ function HomeView() {
   const hasPublished = projects.some((p) => p.websiteUrl);
 
   return (
-    <AppShell isAdmin={user?.role === "Admin"}>
+    <AppShell>
       <h1 className="font-display text-3xl font-bold sm:text-[2.1rem]">
         Welcome back{user?.displayName ? `, ${user.displayName}` : ""}
       </h1>

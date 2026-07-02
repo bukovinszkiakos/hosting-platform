@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, ExternalLink, GitBranch, Pencil, Rocket } from "lucide-react";
 
-import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { api, ApiError, type Deployment, type Project } from "@/services/api";
+import {
+  api,
+  ApiError,
+  isDeploymentActive,
+  type Deployment,
+  type Project,
+} from "@/services/api";
 
 export default function ProjectDetailsPage() {
   return (
@@ -25,7 +30,6 @@ export default function ProjectDetailsPage() {
 }
 
 function ProjectDetailsView() {
-  const { user } = useAuth();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -89,7 +93,7 @@ function ProjectDetailsView() {
   }
 
   return (
-    <AppShell isAdmin={user?.role === "Admin"}>
+    <AppShell>
       <div className="mx-auto w-full max-w-5xl">
         <Link
           href="/projects"
@@ -139,6 +143,11 @@ function ProjectInformation({
 }) {
   const [editing, setEditing] = useState(false);
 
+  // Disable Deploy while a deployment for this project is still in progress. This
+  // complements the backend guard, which rejects a concurrent deployment
+  // (see docs/10-deployment-workflow.md "One Active Deployment Per Project").
+  const deployInProgress = deploying || isDeploymentActive(project.currentStatus);
+
   return (
     <Card className="p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -162,14 +171,14 @@ function ProjectInformation({
           <Button
             variant="outline"
             onClick={() => setEditing((value) => !value)}
-            disabled={deploying || editing}
+            disabled={deployInProgress || editing}
           >
             <Pencil />
             Edit
           </Button>
-          <Button onClick={onDeploy} disabled={deploying}>
+          <Button onClick={onDeploy} disabled={deployInProgress}>
             <Rocket />
-            {deploying ? "Deploying…" : "Deploy"}
+            {deployInProgress ? "Deploying…" : "Deploy"}
           </Button>
         </div>
       </div>

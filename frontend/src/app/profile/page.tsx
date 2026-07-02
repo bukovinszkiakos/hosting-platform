@@ -25,7 +25,7 @@ export default function ProfilePage() {
 }
 
 function ProfileView() {
-  const { user, refresh } = useAuth();
+  const { refresh } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,7 @@ function ProfileView() {
   }
 
   return (
-    <AppShell isAdmin={user?.role === "Admin"}>
+    <AppShell>
       <PageHeader
         title="Profile"
         description="Your account information and settings."

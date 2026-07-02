@@ -10,12 +10,12 @@ import { navItemsForRole } from "@/components/layout/nav-items";
 import { Logo } from "@/components/ui/logo";
 import { cn, initials } from "@/lib/utils";
 
-export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
+export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
-  const items = navItemsForRole(isAdmin);
+  const items = navItemsForRole(user?.role === "Admin");
 
   async function handleLogout() {
     setLoggingOut(true);

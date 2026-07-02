@@ -435,7 +435,10 @@ Non-2xx responses should throw errors.
 
 ### 401
 
-Redirect to Login Page.
+Redirect to Login Page. Handled centrally: `apiFetch` invokes a registered
+handler (the `AuthProvider`) that clears the cached user, so a session that
+expires mid-use causes `ProtectedRoute` to redirect to Login — not only on the
+initial load.
 
 ### 403
 
@@ -455,6 +458,10 @@ Use:
 * useState
 
 React Query will not be used in the MVP.
+
+Live updates use `setInterval` polling from a `useEffect` (no additional
+libraries): the Deployment Details page refreshes a non-terminal deployment and
+its logs every ~5 seconds and stops once the deployment reaches a terminal state.
 
 ---
 
@@ -532,7 +539,9 @@ The frontend follows one consistent visual language defined by design tokens in
 * **Motion**: tasteful and subtle — hover elevation on interactive cards, button
   press feedback, an animated status dot, `fadeUp`/`fadeIn` content entrances
   (the `animate-fade-up` / `animate-fade-in` utilities), and skeleton loaders.
-  Animations are kept minimal and premium, never distracting.
+  Animations are kept minimal and premium, never distracting. Motion honours the
+  user's `prefers-reduced-motion` setting: when reduced motion is requested,
+  animations and transitions are neutralised globally (see `app/globals.css`).
 
 ## Design Goals
 
