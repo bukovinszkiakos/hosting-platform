@@ -105,3 +105,13 @@ cd frontend && npm run lint && npx tsc --noEmit && npm run build
 cd terraform && terraform fmt -recursive -check
 (cd environments/dev && terraform init -backend=false && terraform validate)
 ```
+
+## Continuous Integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs these same checks on
+every push and pull request, as four parallel jobs: **backend** (restore +
+build), **frontend** (ESLint + `tsc --noEmit` + build), **terraform** (`fmt
+-check` + `validate` for the backend/dev/prod configs), and **kubernetes**
+(`kubeconform` schema validation of `k8s/`). NuGet and npm downloads are cached.
+CI is build/validate only — deploying to AWS is a separate, manually triggered
+workflow (not yet implemented).

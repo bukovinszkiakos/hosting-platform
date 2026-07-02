@@ -1,0 +1,123 @@
+name: CI
+
+# Continuous Integration only — build/lint/validate the whole monorepo on every
+# push and pull request. Deployment to AWS is intentionally NOT part of this
+# workflow; it will be a separate, manually triggered workflow.
+on:
+  push:
+  pull_request:
+
+# Cancel superseded runs for the same ref so only the latest commit is checked.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: CI only needs to read the repository.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (restore + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # No packages.lock.json in the repo, so key the NuGet cache on the project
+      # files (they change rarely).
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('backend/**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore HostingPlatform.sln
+
+      - name: Build
+        run: dotnet build HostingPlatform.sln --no-restore -c Release -warnaserror
+
+  frontend:
+    name: Frontend (lint + types + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  terraform:
+    name: Terraform (fmt + validate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.6"
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+
+      # Validate each root configuration (backend state bootstrap + both
+      # environments). Modules are validated transitively through the environments.
+      # -backend=false so no S3 backend / AWS credentials are needed.
+      - name: Validate
+        run: |
+          for dir in backend environments/dev environments/prod; do
+            echo "== $dir =="
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+          done
+
+  kubernetes:
+    name: Kubernetes (kubeconform)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Schema-validate the manifests without a cluster. -ignore-missing-schemas
+      # tolerates CRDs; -strict rejects unknown/duplicate fields.
+      - name: Validate manifests (kubeconform)
+        run: |
+          VERSION="v0.6.7"
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${VERSION}/kubeconform-linux-amd64.tar.gz" | tar -xz
+          ./kubeconform -strict -summary -ignore-missing-schemas k8s/

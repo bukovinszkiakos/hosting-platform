@@ -278,21 +278,27 @@ scripts/
 ```text id="xvvgqx"
 .github/
 └── workflows/
+    └── ci.yml
 ```
 
 ---
 
 # CI Pipeline
 
-Possible workflows:
+`ci.yml` runs on every push and pull request. It only builds/validates the
+project (Continuous Integration); deployment to AWS is intentionally a separate,
+manually triggered workflow (not yet implemented). The workflow runs four
+independent jobs in parallel:
 
 ```text id="m4qfki"
-terraform-plan
-terraform-apply
-frontend-build
-backend-build
-tests
+backend      -> dotnet restore + build (-warnaserror), NuGet cache
+frontend     -> npm ci + ESLint + tsc --noEmit + next build, npm cache
+terraform    -> terraform fmt -check + validate (backend, dev, prod)
+kubernetes   -> kubeconform schema validation of k8s/ (no cluster needed)
 ```
+
+Any failing step fails its job and the overall check. See `docs/07-kubernetes.md`
+for what Kubernetes validation can and cannot cover without a cluster.
 
 ---
 
