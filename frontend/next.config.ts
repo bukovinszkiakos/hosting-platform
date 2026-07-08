@@ -11,6 +11,10 @@ import type { NextConfig } from "next";
 const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? "http://localhost:5165";
 
 const nextConfig: NextConfig = {
+  // Emit a self-contained production server (.next/standalone) so the Docker
+  // runtime image ships only the traced files/dependencies it needs. This is a
+  // packaging option only — routing, rewrites and rendering are unchanged.
+  output: "standalone",
   async rewrites() {
     return [
       {

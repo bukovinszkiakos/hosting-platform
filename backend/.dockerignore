@@ -1,0 +1,12 @@
+# Keep the build context small and reproducible: never ship local build output,
+# IDE state, or the Dockerfile itself into the image.
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+.config/
+.git/
+.gitignore
+.gitkeep
+Dockerfile
+.dockerignore

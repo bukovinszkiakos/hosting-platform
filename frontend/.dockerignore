@@ -1,0 +1,10 @@
+# Keep the build context small: dependencies and build output are recreated
+# inside the image, and local/IDE state must never be shipped.
+node_modules
+.next
+npm-debug.log*
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+.env*.local

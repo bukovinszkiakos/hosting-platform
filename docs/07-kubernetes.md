@@ -439,11 +439,13 @@ Future versions may include:
 * Multiple Namespaces
 * Multi-Tenant Architecture
 * Advanced Autoscaling
-* **Pod security hardening** for the app pods (`runAsNonRoot`,
-  `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem`). Deferred because
-  it must be validated against the actual (not-yet-built) container images — a
-  read-only root or forced non-root user can prevent a pod from starting — and
-  build containers legitimately need to write and install packages at runtime.
+* **Pod security hardening** for the app pods (an explicit `securityContext`:
+  `runAsNonRoot`, `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem`).
+  The application images already run as a non-root user (see `16-deployment.md`
+  "Container images"), so declaring the `securityContext` is the remaining step;
+  it is deferred because `readOnlyRootFilesystem` in particular must be validated
+  against the running images (a read-only root can prevent a pod from starting),
+  and build containers legitimately need to write and install packages at runtime.
 * **Dedicated build service account + per-project IAM session policies** (see
   "Service Account and AWS Access").
 * **Durable deployment queue + persisted Data Protection keys**, which together

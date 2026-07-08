@@ -71,7 +71,9 @@ frontend/
 │   ├── services/
 │   ├── types/
 │   └── hooks/
-└── public/
+├── public/
+├── Dockerfile          # multi-stage production image (Next.js standalone)
+└── .dockerignore
 ```
 
 ---
@@ -101,6 +103,8 @@ ASP.NET Core Web API.
 ```text id="pl3g1h"
 backend/
 ├── HostingPlatform.sln
+├── Dockerfile          # multi-stage production image (.NET publish -> chiseled runtime)
+├── .dockerignore
 └── src/
     └── HostingPlatform.Api/
         ├── Controllers/
