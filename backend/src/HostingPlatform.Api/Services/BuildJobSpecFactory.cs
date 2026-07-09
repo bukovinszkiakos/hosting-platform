@@ -131,11 +131,17 @@ public class BuildJobSpecFactory : IBuildJobSpecFactory
         if [ -f package.json ]; then
           npm install
           npm run build
+          OUTPUT=""
+          for dir in dist build out; do
+            if [ -d "$dir" ]; then OUTPUT="$dir"; break; fi
+          done
+          if [ -z "$OUTPUT" ]; then
+            echo "ERROR: build did not produce a supported output directory (expected dist/, build/ or out/)." >&2
+            exit 1
+          fi
+        else
+          OUTPUT=.
         fi
-        OUTPUT=.
-        for dir in dist build out; do
-          if [ -d "$dir" ]; then OUTPUT="$dir"; break; fi
-        done
         aws s3 sync "$OUTPUT" "s3://$S3_BUCKET/$USER_ID/$PROJECT_ID/" --delete --exclude ".git/*"
         aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/$USER_ID/$PROJECT_ID/*"
         """;

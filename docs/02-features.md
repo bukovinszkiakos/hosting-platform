@@ -198,6 +198,11 @@ Examples:
 * Vite
 * Angular
 
+> **Known limitation:** for single-page apps with client-side routing, refreshing
+> or deep-linking a client route returns an error (only the site root URL works
+> reliably). This is a limitation of the shared CloudFront distribution — see
+> `05-aws-architecture.md` "CloudFront".
+
 ---
 
 # Future Features

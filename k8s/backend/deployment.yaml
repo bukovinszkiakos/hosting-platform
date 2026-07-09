@@ -11,6 +11,13 @@ spec:
   # queued deployments and fail to share auth cookies. There is intentionally no
   # backend HPA (see docs/07-kubernetes.md "Horizontal Pod Autoscaler").
   replicas: 1
+  # Recreate, not RollingUpdate: the default rolling update briefly runs TWO
+  # backend pods (maxSurge 1), violating the single-replica invariant above —
+  # the new pod's startup recovery would mark deployments Failed while the old
+  # pod is still driving them, and the pods cannot share auth cookies. The cost
+  # is a few seconds of API downtime per deploy, which the MVP accepts.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: backend

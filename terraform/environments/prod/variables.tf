@@ -41,12 +41,17 @@ variable "az_count" {
 
 variable "db_password" {
   type        = string
-  description = "Master password for the RDS PostgreSQL database. Provide via TF_VAR_db_password; never commit it."
+  description = "Master password for the RDS PostgreSQL database. Provide via TF_VAR_db_password; never commit it. Letters, digits and !#$%^&*()_+=.,:?~- only (RDS forbids / @ \" and spaces; ; and ' would corrupt the Npgsql connection string built by bootstrap-config.sh)."
   sensitive   = true
 
   validation {
     condition     = length(var.db_password) >= 8
     error_message = "db_password must be at least 8 characters."
+  }
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9!#$%^&*()_+=.,:?~-]+$", var.db_password))
+    error_message = "db_password may contain only letters, digits and !#$%^&*()_+=.,:?~- (RDS forbids / @ \" and spaces; ; and ' break the generated connection string)."
   }
 }
 
@@ -70,4 +75,14 @@ variable "hosted_zone_name" {
   type        = string
   description = "Name of the existing public Route53 hosted zone authoritative for domain_name (e.g. example.com). Required when domain_name is set."
   default     = ""
+}
+
+variable "cluster_endpoint_public_access_cidrs" {
+  type        = list(string)
+  description = "CIDR blocks allowed to reach the public EKS API endpoint. Deliberately has no default: production must explicitly list trusted administration locations (e.g. an office/VPN egress IP) — see docs/06-terraform.md \"EKS Module\"."
+
+  validation {
+    condition     = length(var.cluster_endpoint_public_access_cidrs) > 0
+    error_message = "cluster_endpoint_public_access_cidrs must contain at least one CIDR block."
+  }
 }

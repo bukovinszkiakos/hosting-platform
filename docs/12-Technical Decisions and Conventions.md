@@ -701,10 +701,18 @@ Terraform `tfvars` files take precedence.
 
 ```text id="9rwrrw"
 Managed Node Group
+Instance Type: t3.medium
 Min Nodes: 1
 Max Nodes: 3
-Desired Nodes: 1
+Desired Nodes: 2
 ```
+
+> Desired is 2 (not 1) because a build Job requests 1000m CPU, which cannot be
+> scheduled on a single t3.medium alongside the backend (500m), frontend (250m)
+> and system pods. There is no Cluster Autoscaler/Karpenter, so the node count
+> is effectively static — Min/Max only bound manual resizing (see
+> `07-kubernetes.md` "Node Capacity"). Sizing is set explicitly in
+> `terraform/environments/dev/main.tf`, never left to module defaults.
 
 ## Database
 

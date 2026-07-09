@@ -155,89 +155,45 @@ The repository is cloned into a temporary workspace.
 
 ---
 
-# Step 6 - Framework Detection
+# Step 6 - Project Type Detection
 
-The platform automatically detects the project type.
+Detection is deliberately simple in the MVP — a single rule based on repository
+contents:
 
-## Supported Frameworks
+* **`package.json` present** → npm project: the build runs `npm install` and
+  `npm run build`.
+* **no `package.json`** → static site: the repository root is uploaded as-is
+  (no build step).
 
-```text
-React
-Vue
-Vite
-Angular
-Static HTML
-```
-
----
-
-## Detection Rules
-
-### React
-
-```text
-package.json
-react dependency
-```
+There is **no per-framework detection**: React, Vue, Vite and Angular projects
+all follow the same npm path. A framework works if (and only if) its
+`npm run build` emits one of the supported output directories (Step 7).
 
 ---
 
-### Vite
+# Step 7 - Build Output Validation
+
+For an npm project, the build must produce one of the supported output
+directories, checked in this order:
 
 ```text
-package.json
-vite dependency
+dist/
+build/
+out/
 ```
 
----
+* If none of them exists after `npm run build`, the build **fails** with a clear
+  error (`build did not produce a supported output directory`) and the
+  deployment becomes `Failed`. The repository root is never uploaded as a
+  fallback for npm projects.
+* A missing `build` script fails at `npm run build` with npm's own error, which
+  is captured in the deployment logs.
+* Frameworks whose default output lands elsewhere (e.g. Gatsby's `public/`, or
+  Angular's nested `dist/<app>/browser/`, which uploads but does not serve from
+  the site root) are **not supported** by the MVP.
 
-### Angular
-
-```text
-@angular/core
-```
-
----
-
-### Static HTML
-
-```text
-index.html
-```
-
----
-
-# Step 7 - Build Validation
-
-The platform validates:
-
-## package.json
-
-Whether the file exists.
-
----
-
-## Build Script
-
-Whether a build script exists.
-
-Example:
-
-```json
-{
-  "scripts": {
-    "build": "vite build"
-  }
-}
-```
-
-If validation fails:
-
-```text
-Failed
-```
-
-status is assigned.
+Create React App (`build/`), Vite and Vue CLI (`dist/`), and static `next export`
+style `out/` projects fit this contract out of the box.
 
 ---
 
@@ -373,10 +329,10 @@ Private repositories are not supported
 
 ---
 
-## Unsupported Framework
+## No Supported Build Output Directory
 
 ```text
-Unsupported project type
+build did not produce a supported output directory (expected dist/, build/ or out/)
 ```
 
 ---
@@ -506,7 +462,11 @@ build Jobs from racing on the same S3 prefix.
   backend pod that accepted the request. If that pod restarts mid-build, the
   deployment is marked `Failed` on the next startup (see "Startup Recovery")
   rather than retried.
-* Deployments are processed one at a time per pod.
+* Deployments are processed one at a time per pod. With the single-replica
+  backend this is also the platform's **effective global build-concurrency
+  limit** (see `07-kubernetes.md` "Backend Replicas") — scaling the backend out
+  would remove it, so quota/concurrency controls must accompany multi-replica
+  operation.
 * A failed build is not retried (`backoffLimit: 0`); it becomes a `Failed`
   deployment.
 

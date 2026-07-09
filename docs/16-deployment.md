@@ -30,24 +30,27 @@ Bootstrap (manual, one-time / infrequent)
   4. AWS Load Balancer Controller     (scripts/deployment/install-alb-controller.sh; Helm chart, reuses the Terraform role + Pod Identity)
   5. Build & push images to ECR       (repositories created by Terraform in step 2; build/tag/push backend + frontend)
   6. Create ConfigMap + Secret        (scripts/deployment/bootstrap-config.sh; from Terraform outputs)
+  7. CI deploy principal              (IAM user + EKS access entry + GitHub secrets — see "CI deploy principal" below)
 
 Repeatable (automated — deploy.yml, workflow_dispatch)
-  7. Apply namespace / service account / RBAC
-  8. Run the database migration Job   (backend image + `migrate`; applied and awaited before rollout)
-  9. Apply Services + Deployments (with the supplied image URIs) + frontend HPA
- 10. Wait for the rollout
- 11. Apply the Ingress (ACM cert injected from the secret)
- 12. Print a deployment summary
+  8. Apply namespace / service account / RBAC
+  9. Run the database migration Job   (backend image + `migrate`; applied and awaited before rollout)
+ 10. Apply Services + Deployments (with the supplied image URIs) + frontend HPA
+ 11. Wait for the rollout
+ 12. Apply the Ingress (ACM cert injected from the secret)
+ 13. Print a deployment summary
 
 After the first deploy (one-time): point a Route53 alias record for the domain at
 the provisioned ALB (see "HTTPS, certificates and DNS").
 ```
 
-The application deploy (steps 7–12) is what `deploy.yml` automates — including the
-database migration (step 8), which runs as an idempotent one-off Job before the
-rollout (see "Database migrations" below). Steps 0–6 are the manual bootstrap
+The application deploy (steps 8–13) is what `deploy.yml` automates — including the
+database migration (step 9), which runs as an idempotent one-off Job before the
+rollout (see "Database migrations" below). Steps 0–7 are the manual bootstrap
 described below; step 0 (domain + hosted zone) is a prerequisite of step 2 so the
-ACM certificate can be DNS-validated.
+ACM certificate can be DNS-validated, and step 7 (CI deploy principal) is a
+prerequisite of the first `deploy.yml` run — without the access entry every
+`kubectl` call in the workflow fails with an authorization error.
 
 ---
 
@@ -64,9 +67,10 @@ Set these at the repository level, or (preferred) on the `dev` / `prod` GitHub
 | `ACM_CERTIFICATE_ARN` | ACM certificate ARN injected into the ALB Ingress for HTTPS — take it from the `acm_certificate_arn` Terraform output (see "HTTPS, certificates and DNS") |
 
 The workflow validates all four are present before doing anything and fails early
-with a clear message if any is missing. The IAM principal needs permission to
-`eks:DescribeCluster` / update kubeconfig and to act on the cluster (map it to a
-Kubernetes group with the needed RBAC, e.g. via an access entry or `aws-auth`).
+with a clear message if any is missing. The IAM principal these keys belong to
+must be created and granted cluster access first — bootstrap step 7, "CI deploy
+principal" below. Without it, the workflow authenticates to AWS but every
+`kubectl` command fails with an authorization error.
 
 > **Security note (future hardening):** the workflow uses long-lived access keys
 > via GitHub Secrets, as requested. The recommended production approach is GitHub
@@ -128,6 +132,44 @@ automated image publishing pipeline yet).
    the non-secret values from the Terraform outputs and the connection string from
    `DB_PASSWORD`, and applies all three objects idempotently. `deploy.yml` verifies
    they exist and fails early if not. See "Configuration and secrets bootstrap".
+7. **CI deploy principal (IAM user + EKS access entry)** — `deploy.yml`
+   authenticates with IAM user credentials, but IAM authentication alone grants
+   **no** Kubernetes permissions: the identity that ran `terraform apply` is
+   cluster admin automatically (the cluster-creator access entry), while any
+   other principal must be granted access explicitly via an **EKS access
+   entry**. Create the deploy user, grant it `eks:DescribeCluster` (all
+   `update-kubeconfig` needs), create its access entry, and store its keys as
+   the GitHub secrets:
+
+   ```bash
+   CLUSTER=hosting-platform-<env>-eks
+   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+   aws iam create-user --user-name hosting-platform-deploy
+   aws iam put-user-policy --user-name hosting-platform-deploy \
+     --policy-name eks-describe-cluster \
+     --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"eks:DescribeCluster","Resource":"arn:aws:eks:*:'"$ACCOUNT_ID"':cluster/hosting-platform-*"}]}'
+
+   aws eks create-access-entry --cluster-name "$CLUSTER" \
+     --principal-arn "arn:aws:iam::${ACCOUNT_ID}:user/hosting-platform-deploy"
+   aws eks associate-access-policy --cluster-name "$CLUSTER" \
+     --principal-arn "arn:aws:iam::${ACCOUNT_ID}:user/hosting-platform-deploy" \
+     --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+     --access-scope type=cluster
+
+   aws iam create-access-key --user-name hosting-platform-deploy
+   # -> put AccessKeyId / SecretAccessKey into the AWS_ACCESS_KEY_ID /
+   #    AWS_SECRET_ACCESS_KEY GitHub secrets
+   ```
+
+   `AmazonEKSClusterAdminPolicy` is deliberately broad for the MVP: the workflow
+   applies cluster-scoped objects (the namespace) and RBAC Roles/RoleBindings,
+   which narrower access policies cannot create without escalation privileges.
+   Scoping the deploy principal down (a dedicated access policy or namespace
+   scope plus a separate namespace-creation step) is a future hardening, as is
+   replacing the long-lived keys with GitHub OIDC federation (see the security
+   note above). Repeat the access entry per environment/cluster.
+
 > **Database schema** — no longer a manual bootstrap step. Migrations are applied
 > in-cluster by the migration Job that `deploy.yml` runs before every rollout (see
 > "Database migrations" below). The bootstrap only has to ensure the ConfigMap and
@@ -276,6 +318,19 @@ and make it trivial to capture in logs/CI. It is supplied out-of-band (the same
 value as `TF_VAR_db_password`) and only ever lands in the Kubernetes Secret — never
 on disk, never in Git. `.gitignore` also blocks committing real
 `k8s/secrets/*.yaml` / `k8s/base/configmap.yaml` files as defense-in-depth.
+
+**Password characters:** use letters, digits and the symbols
+`! # $ % ^ & * ( ) _ + = . , : ? ~ -` only. RDS forbids `/`, `@`, `"` and
+spaces, and `;` or `'` would silently corrupt the Npgsql connection string the
+script builds. Both the Terraform `db_password` variable and
+`bootstrap-config.sh` validate this and fail fast on a disallowed character.
+
+**Master user (accepted MVP limitation):** the connection string uses the RDS
+**master** username — the application and the migration Job run with full
+database-owner rights, and the app credential cannot be rotated independently of
+the admin credential. Acceptable while the MVP has a single database and no
+untrusted users; a dedicated least-privilege application role (and later Secrets
+Manager + ESO, below) is the production fix.
 
 ## Operational procedure
 
@@ -556,6 +611,37 @@ summary (including the ALB hostname once provisioned).
 
 ---
 
+# Post-deploy verification
+
+Run once after the first deployment (and after any node group / AMI change):
+
+* **Pods cannot reach the node's instance metadata service (IMDS).** Build Jobs
+  execute untrusted repository code; if a pod can reach IMDS it can steal the
+  **node role's** credentials (ECR pull, CNI, worker policies). EKS AL2023 AMIs
+  default to IMDSv2-required with hop limit 1, which blocks pods — but that is
+  an inherited platform default, not something this project's Terraform asserts,
+  so verify it:
+
+  ```bash
+  kubectl -n hosting-platform run imds-check --rm -i --restart=Never \
+    --image=curlimages/curl --command -- \
+    curl -sS -m 3 http://169.254.169.254/latest/meta-data/
+  # EXPECTED: the request times out / fails. If metadata is returned, pods can
+  # reach IMDS — set metadata_options (IMDSv2 required, hop limit 1) on the
+  # node group before allowing any untrusted build.
+  ```
+
+* **App and ALB health**: `kubectl -n hosting-platform get pods`, then open the
+  frontend root (`https://<domain>/`) and an API route
+  (`https://<domain>/api/auth/me` → `401` when unauthenticated is the expected
+  healthy response). `/healthz` itself is not routed through the Ingress — only
+  the ALB target-group health checker and the Kubernetes probes call it on the
+  pods directly.
+* **End-to-end build**: deploy a known-good public repository and confirm the
+  published CloudFront URL serves it (see `15-demo.md` "Full AWS demo").
+
+---
+
 # Rollback strategy
 
 * **Fast rollback** — `kubectl -n hosting-platform rollout undo deployment/backend`
@@ -576,6 +662,8 @@ summary (including the ALB hostname once provisioned).
   those are the manual bootstrap above. It *does* apply database migrations, via
   the pre-rollout migration Job (see "Database migrations").
 * **Long-lived AWS keys** (OIDC recommended later — see the security note).
+* **The app connects as the RDS master user** — accepted MVP limitation; see
+  "Configuration and secrets bootstrap".
 * **Single-replica backend.** The backend has no HPA (in-memory queue +
   ephemeral Data Protection keys); see `07-kubernetes.md` "Backend Replicas".
 * **Migrations are not auto-reverted.** They are applied automatically before each

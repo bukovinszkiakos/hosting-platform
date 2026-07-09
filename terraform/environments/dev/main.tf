@@ -52,6 +52,17 @@ module "eks" {
   name_prefix        = local.name_prefix
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
+
+  # Explicit sizing — module defaults must not decide cost (docs/12 "Development
+  # Environment Values"). Two nodes are the functional minimum: a build Job
+  # requests 1000m CPU, which does not fit on a single t3.medium next to the
+  # backend (500m), frontend (250m) and system pods, and there is no cluster
+  # autoscaler to add a node on demand (min/max only bound manual resizing —
+  # see docs/07-kubernetes.md "Node Capacity").
+  node_instance_types = ["t3.medium"]
+  node_desired_size   = 2
+  node_min_size       = 1
+  node_max_size       = 3
 }
 
 module "rds" {

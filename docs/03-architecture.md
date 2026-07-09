@@ -241,17 +241,15 @@ The user receives the public website URL.
 
 # Framework Detection
 
-The MVP automatically detects supported frameworks.
+Detection is deliberately simple in the MVP: a repository with `package.json`
+is built with `npm install` + `npm run build`; a repository without one is
+uploaded as-is (static HTML). There is no per-framework detection.
 
-## Supported Frameworks
-
-* React
-* Vue
-* Vite
-* Angular
-* Static HTML
-
-Detection is based on repository contents.
+An npm build must emit one of the supported output directories — `dist/`,
+`build/` or `out/` — otherwise the build fails with a clear error (see
+`10-deployment-workflow.md` Steps 6–7). Frameworks whose default build output
+matches this contract (Create React App, Vite, Vue CLI, static exports to
+`out/`) work out of the box; others are not supported by the MVP.
 
 ---
 

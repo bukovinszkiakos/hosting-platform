@@ -185,8 +185,14 @@ node:20-slim
 ```
 
 `node:20-slim` does not include `git` or the AWS CLI v2, so the build script
-installs both at container start before cloning and publishing. Baking them into
-a prebuilt image (ECR) is a future optimization.
+installs both at container start before cloning and publishing. Because of this
+runtime install (`apt-get`), the build container currently **runs as root**
+while executing untrusted repository code.
+
+A **prebuilt, non-root build image** (ECR) remains a planned future improvement;
+it would remove the root requirement, cut ~150 MB of per-build NAT traffic and
+1–2 minutes of install latency, and drop the build-time dependency on the
+Debian/AWS CLI mirrors.
 
 ---
 
@@ -196,8 +202,8 @@ a prebuilt image (ECR) is a future optimization.
 apt-get install -y git curl unzip   # node:20-slim lacks these
 install AWS CLI v2
 git clone
-npm install
-npm run build
+npm install                          # only when package.json exists
+npm run build                        # output must be dist/, build/ or out/ — otherwise the build fails
 aws s3 sync
 ```
 
@@ -298,17 +304,20 @@ untrusted repository code (`npm install` executes arbitrary scripts) and never
 calls the Kubernetes API, so the default API token is not mounted. Pod Identity
 injects its own credential token separately, so AWS access is unaffected.
 
-> **Deferred hardening.** The backend Deployment and the build Jobs currently
-> share this single service account and IAM role. Giving build Jobs a dedicated
-> service account and a minimal, build-only IAM role — ideally with per-project
-> session policies scoping S3 access to `{userId}/{projectId}/` — is a planned
-> future enhancement. It is deferred for the MVP because: (1) the main K8s risk
-> — untrusted build code inheriting the backend's Job-creation RBAC — is already
-> neutralized by `automountServiceAccountToken: false` (the build container has no
-> API token), and (2) without per-project scoping, a separate build role (still
-> bucket-wide) adds infrastructure for only a marginal AWS-isolation gain. The
-> dedicated build service account and role should be introduced together with the
-> per-project session policies.
+> **Known security limitation — must be addressed before real users.** The
+> backend Deployment and the build Jobs currently share this single service
+> account and IAM role. Build Jobs execute **untrusted repository code**
+> (`npm install` runs arbitrary scripts), and EKS Pod Identity delivers the
+> role's AWS credentials to *any process in the pod* — including that untrusted
+> code. The role has write/delete access to the **entire hosting bucket** and
+> CloudFront invalidation rights, so a malicious build can read, overwrite or
+> delete **every user's published site** and issue unbounded invalidations. The
+> Kubernetes-API side is neutralized (`automountServiceAccountToken: false` —
+> the build container has no API token), but the AWS side is not. This is
+> accepted only while the platform has no untrusted users. Before opening the
+> platform to real users, build Jobs must get a dedicated service account and a
+> minimal, build-only IAM role with per-project session policies scoping S3
+> access to `{userId}/{projectId}/`.
 
 ---
 
@@ -431,6 +440,32 @@ deployment queue is durable and Data Protection keys are persisted (see
 "MVP Limitations" in `10-deployment-workflow.md`). A single-replica restart still
 logs users out (ephemeral keys) and marks any in-flight deployment `Failed` via
 startup recovery — accepted MVP trade-offs.
+
+The single replica also serves as the platform's **effective deployment
+concurrency limit**: the worker processes one deployment at a time per pod, so
+exactly one build Job runs at a time cluster-wide. This is currently the only
+global cap on build resource consumption (there is no per-user quota or rate
+limit — projects per user are unlimited). Scaling the backend out would silently
+remove this throttle, so explicit build-concurrency/quota controls must be
+introduced together with any multi-replica backend.
+
+---
+
+# Node Capacity
+
+Worker-node count is **effectively static**: no Cluster Autoscaler or Karpenter
+is installed, so the managed node group never scales itself — the Terraform
+min/max sizes only bound *manual* resizing. Consequences:
+
+* The frontend HPA can only scale into existing node capacity; pods that do not
+  fit remain `Pending`.
+* A build Job pod that cannot be scheduled stays `Pending` until the Job's
+  `activeDeadlineSeconds` / the worker's poll timeout expires, and the
+  deployment is marked `Failed`.
+
+This is why dev runs **2 nodes** (a build Job's 1000m CPU request does not fit
+on a single t3.medium next to the apps and system pods — see docs/12
+"Development Environment Values"). Node autoscaling is a future enhancement.
 
 ---
 

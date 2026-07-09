@@ -6,7 +6,9 @@ metadata:
   labels:
     app: frontend
 spec:
-  replicas: 1
+  # No spec.replicas: the frontend HPA (k8s/hpa/frontend-hpa.yaml) owns the
+  # replica count (1-3). Declaring replicas here would reset the count to 1 on
+  # every `kubectl apply` and momentarily undo the HPA's scaling.
   selector:
     matchLabels:
       app: frontend

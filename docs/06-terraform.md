@@ -202,8 +202,15 @@ including recovery and intentional teardown.
 The API endpoint has both private and public access enabled. `kubernetes_version`
 defaults to an EKS standard-support release (currently `1.34`) to avoid
 extended-support pricing; verify the standard-support range at deploy time.
-`cluster_endpoint_public_access_cidrs` (default open) should be restricted to
-trusted administration locations in production.
+`cluster_endpoint_public_access_cidrs` defaults to open (dev); in **prod** the
+environment declares it as a **required variable with no default**, so a
+production apply must explicitly list trusted administration CIDRs — the
+documented hardening cannot be skipped silently.
+
+The node group has **no autoscaler** (no Cluster Autoscaler/Karpenter): min/max
+sizes only bound manual resizing, so node capacity is effectively static (see
+`07-kubernetes.md` "Node Capacity"). Each environment sets its node sizing
+explicitly rather than relying on module defaults.
 
 ## Inputs
 

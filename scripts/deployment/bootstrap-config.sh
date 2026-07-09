@@ -41,6 +41,16 @@ fi
 # The DB password is intentionally NOT a Terraform output; supply it out-of-band.
 : "${DB_PASSWORD:?Set DB_PASSWORD (the RDS master password) in the environment}"
 
+# Fail fast on characters that RDS forbids (/ @ " space) or that would silently
+# corrupt the Npgsql connection string built below (; '). Mirrors the Terraform
+# db_password validation — see docs/16-deployment.md "Which values must be
+# supplied manually".
+if printf '%s' "$DB_PASSWORD" | grep -q "[;'\"@/ ]"; then
+  echo "error: DB_PASSWORD contains a disallowed character (; ' \" @ / or space)." >&2
+  echo "       Use letters, digits and: ! # \$ % ^ & * ( ) _ + = . , : ? ~ -" >&2
+  exit 1
+fi
+
 tf() { terraform -chdir="$TF_DIR" output -raw "$1"; }
 
 echo "Reading Terraform outputs for '${ENVIRONMENT}'..."

@@ -53,11 +53,16 @@ module "eks" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
 
-  # Production headroom (dev relies on the smaller module defaults).
+  # Production headroom.
   node_instance_types = ["t3.large"]
   node_desired_size   = 3
   node_min_size       = 2
   node_max_size       = 5
+
+  # Required, no default: production must explicitly restrict the public EKS
+  # API endpoint to trusted administration CIDRs (docs/06-terraform.md
+  # "EKS Module"). Supplied via terraform.tfvars at apply time.
+  cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
 }
 
 module "rds" {

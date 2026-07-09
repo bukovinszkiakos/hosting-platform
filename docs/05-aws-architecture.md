@@ -210,6 +210,28 @@ root), a CloudFront Function rewrites directory requests to the site's
 /{userId}/{projectId}/     -> /{userId}/{projectId}/index.html
 ```
 
+> **Known limitation — must be addressed before real users.** Because every
+> hosted site lives under a path on the **same CloudFront domain, all tenant
+> sites share a single web origin**. Any hosted site's JavaScript therefore runs
+> same-origin with every other hosted site, enabling cross-tenant tampering with
+> `localStorage`/service workers and convincing phishing between tenants. There
+> is no platform authentication on this origin, so the blast radius is limited
+> today, but this is acceptable only while the platform has no untrusted users.
+> The standard fix (used by Netlify/Vercel/GitHub Pages) is a **subdomain per
+> site**, which requires a custom domain + wildcard certificate and is planned
+> alongside custom-domain support.
+
+> **Known limitation — SPA deep links.** The rewrite function maps any
+> extension-less path to `{path}/index.html`. For a single-page app using
+> client-side routing (React Router, Vue Router, Angular Router), refreshing or
+> deep-linking a client route (e.g. `/{userId}/{projectId}/about`) resolves to
+> `.../about/index.html`, which does not exist in S3 — the visitor gets a raw
+> XML error instead of the app. On a dedicated distribution this is fixed with a
+> custom error response to the site's `index.html`, but on the **shared**
+> distribution there is no per-site error target, so this cannot be fixed in the
+> current model. SPAs load correctly at their root URL; only client-route
+> refresh/deep-linking is affected. The fix arrives with per-site subdomains.
+
 ---
 
 # ECR

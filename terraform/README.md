@@ -42,6 +42,11 @@ The database password is **never committed**. Provide it out-of-band:
 export TF_VAR_db_password="<strong-password>"
 ```
 
+Use letters, digits and `!#$%^&*()_+=.,:?~-` only — RDS forbids `/ @ "` and
+spaces, and `; '` would corrupt the connection string that
+`scripts/deployment/bootstrap-config.sh` builds. Both the variable validation and
+the script enforce this.
+
 `hosting_bucket_name` in `terraform.tfvars` must be globally unique across all of
 AWS S3 — adjust it if the default name is taken.
 
@@ -49,6 +54,16 @@ To enable HTTPS on the platform's ALB endpoint, set `domain_name` and
 `hosted_zone_name` in `terraform.tfvars` (an existing public Route53 hosted zone is
 required — see `docs/16-deployment.md` "HTTPS, certificates and DNS"). Left empty
 (the default), the ACM module is a no-op and the environment still applies.
+
+**Prod only:** `cluster_endpoint_public_access_cidrs` is a required variable with
+no default — a production apply must explicitly list the trusted administration
+CIDRs allowed to reach the public EKS API endpoint (see the commented example in
+`environments/prod/terraform.tfvars`). Dev keeps the open default.
+
+Node counts are **static**: there is no Cluster Autoscaler/Karpenter, so the node
+group min/max only bound manual resizing (see `docs/07-kubernetes.md` "Node
+Capacity"). Dev explicitly runs 2 × t3.medium — the minimum on which a build Job
+(1000m CPU) can schedule next to the apps.
 
 ### 1. Bootstrap remote state (once per AWS account)
 
