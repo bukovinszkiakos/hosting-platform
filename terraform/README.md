@@ -30,9 +30,14 @@ Both environments compose the same modules; they differ only in variables:
 | -------------------- | -------------------- | --------------------- |
 | VPC CIDR             | `10.0.0.0/16`        | `10.1.0.0/16`         |
 | Availability Zones   | 2                    | 3                     |
-| EKS nodes            | 1–3 × `t3.medium`    | 2–5 × `t3.large`      |
+| EKS nodes            | `t3.medium`, 2 desired (1–3) | `t3.large`, 3 desired (2–5) |
 | RDS                  | `db.t3.micro`, single-AZ, 1-day backups, no final snapshot | `db.t3.small`, Multi-AZ, 7-day backups, final snapshot, deletion protection, storage autoscaling |
 | CloudFront price     | `PriceClass_100`     | `PriceClass_All`      |
+| Approx. idle cost    | ~$7/day (~$210–220/mo) | ~$400–450/mo         |
+
+> **`prod` is a reference configuration** — do not apply it in a personal AWS
+> account (~$400–450/month). Deploy and demo `dev` only. See
+> `docs/16-deployment.md` "Cost and teardown".
 
 ## Deploy
 
@@ -144,6 +149,14 @@ terraform apply
   in `terraform/backend/main.tf` first (it is deliberately guarded), then
   `terraform -chdir=terraform/backend destroy`. Do this only after every
   environment has been destroyed.
+
+> **Destroying an environment:** the ALB is created by the AWS Load Balancer
+> Controller, **not** Terraform, so `terraform destroy` will not remove it —
+> delete the Kubernetes Ingress and wait for the ALB to disappear **before**
+> running destroy, or it keeps billing and can block the VPC teardown. This is a
+> portfolio project: destroy `dev` between demos (it is designed to be
+> disposable) rather than leaving it idling at ~$7/day. Full runbook:
+> `docs/16-deployment.md` "Cost and teardown".
 
 ## Validate
 

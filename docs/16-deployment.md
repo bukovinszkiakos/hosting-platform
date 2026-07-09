@@ -122,9 +122,10 @@ automated image publishing pipeline yet).
 
    > **Billing starts here.** From the moment this apply finishes, the always-on
    > resources (EKS control plane, NAT Gateway, nodes, RDS, ALB after the first
-   > deploy) accrue cost — roughly **$6/day for idle dev**. Plan to complete the
-   > remaining bootstrap steps and the first deploy in one sitting rather than
-   > leaving a half-bootstrapped environment running for days.
+   > deploy) accrue cost — roughly **~$7/day (~$210–220/month) for idle dev**.
+   > Plan to complete the remaining bootstrap steps and the first deploy in one
+   > sitting, and **tear the environment down after the demo** — see "Cost and
+   > teardown" below. Idle time, not usage, is the dominant cost.
 3. **ACM certificate secret** — the certificate itself is created by Terraform in
    step 2 (ACM module). Put the `acm_certificate_arn` output value in the
    `ACM_CERTIFICATE_ARN` GitHub secret; `deploy.yml` injects it into the ALB Ingress
@@ -788,6 +789,68 @@ unaffected (stateless, rolling update, HPA-managed).
   and `terraform apply`, or restore from the RDS final snapshot for the database).
   Production RDS has `deletion_protection` and a final snapshot (see
   `06-terraform.md`).
+
+---
+
+# Cost and teardown
+
+This is a portfolio/MVP project running on EKS, which has a **high fixed cost
+floor that no tuning removes**: the EKS control plane (~$73/mo), the NAT Gateway
+(~$38/mo), two nodes (~$70/mo), RDS and the ALB together idle at roughly
+**~$7/day (~$210–220/month)** in `dev` — regardless of traffic. Idle time, not
+usage, is the dominant cost.
+
+## Destroy between demos (primary cost strategy)
+
+The single most effective cost optimization is **not to leave the environment
+running**. The `dev` environment is intentionally **disposable** — RDS has
+`deletion_protection = false` and `skip_final_snapshot = true`, and ECR uses
+`force_delete = true` (see `06-terraform.md`) — precisely so it can be destroyed
+after a demonstration and re-bootstrapped (~30 minutes) when next needed.
+Treat "demo, then destroy the same day" as the normal workflow; leaving `dev`
+up between demos costs ~$210/month for near-zero traffic.
+
+## Teardown order (avoid orphaned, still-billing resources)
+
+**The ALB is created by the AWS Load Balancer Controller, not by Terraform.**
+So `terraform destroy` does **not** delete it — running destroy first leaves the
+ALB (and its target groups) alive and **still billing (~$20/month)**, and the
+dangling network interfaces can also make the VPC destroy hang. You would think
+everything is torn down while an invisible load balancer keeps charging your
+card. Always delete the Ingress first and wait for the ALB to disappear:
+
+```bash
+# 1. Delete the Ingress; the controller then deletes the ALB it created.
+kubectl -n hosting-platform delete ingress hosting-platform
+
+# 2. Wait until the ALB is actually gone (no ELBv2 load balancers remain).
+#    Re-run until it returns an empty list:
+aws elbv2 describe-load-balancers --region "$AWS_REGION" \
+  --query "LoadBalancers[].LoadBalancerName" --output text
+
+# 3. Only now destroy the infrastructure.
+terraform -chdir=terraform/environments/dev destroy
+```
+
+(If you also want to remove the AWS Load Balancer Controller and the remote-state
+bucket, see `07-kubernetes.md` / `06-terraform.md`; the state bucket has
+`prevent_destroy` and is meant to persist across teardowns.)
+
+## Do not apply the `prod` environment in a personal account
+
+`terraform/environments/prod/` is a **reference configuration** — 3× t3.large
+nodes, Multi-AZ RDS, CloudFront `PriceClass_All` — which idles at roughly
+**$400–450/month**. It exists to show a production-shaped setup; it should
+**not** be applied in a personal AWS account. Deploy and demo `dev` only.
+
+## Keep EKS on a standard-support version
+
+The control plane is $0.10/hr on **standard support**. If the cluster's
+Kubernetes version ages out of standard support into **extended support**, that
+jumps to ~$0.60/hr — a silent **~6× increase (~$73 → ~$438/month)**. The version
+is pinned in the EKS module (`kubernetes_version`, currently `1.34`); verify it
+is still within standard support before each deploy and upgrade before it lapses
+(see `06-terraform.md` "EKS Module").
 
 ---
 
