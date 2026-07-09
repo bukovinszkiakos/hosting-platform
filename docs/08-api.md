@@ -230,8 +230,10 @@ POST /api/projects
 ```
 
 `name` is required (≤ 150 chars). `repositoryUrl` is optional (≤ 2048 chars) but,
-when supplied, must be a valid absolute `http`/`https` URL; otherwise `400` is
-returned (`Repository URL is invalid`). The same rules apply to Update Project.
+when supplied, must be a **public HTTPS `github.com` URL** (the MVP supports only
+public GitHub repositories); any other scheme or host returns `400`
+(`Repository URL must be a public HTTPS github.com URL`). The same rules apply to
+Update Project.
 
 ---
 
@@ -433,7 +435,7 @@ All error responses use the standardized shape defined in
   "message": "Validation failed",
   "errors": [
     "Project name is required",
-    "Repository URL is invalid"
+    "Repository URL must be a public HTTPS github.com URL"
   ]
 }
 ```

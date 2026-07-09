@@ -57,7 +57,10 @@ prerequisite of the first `deploy.yml` run — without the access entry every
 # Required GitHub Secrets
 
 Set these at the repository level, or (preferred) on the `dev` / `prod` GitHub
-**Environments** so production can require a reviewer:
+**Environments** so production can require a reviewer. The Environment names
+must be **exactly `dev` and `prod`** — `deploy.yml` sets
+`environment: ${{ inputs.environment }}`, so environment-scoped secrets are
+only picked up when the names match the workflow's input values:
 
 | Secret | Purpose |
 | --- | --- |
@@ -94,6 +97,14 @@ automated image publishing pipeline yet).
    `example.com`) in the environment `terraform.tfvars`. This is a prerequisite of
    the ACM certificate created in step 2; the domain/zone stay manual on purpose
    (see "HTTPS, certificates and DNS").
+
+   > **Wait for NS delegation to propagate before step 2.** ACM validates the
+   > certificate through the hosted zone, and `terraform apply` blocks on that
+   > validation — if the registrar's nameserver delegation has not propagated
+   > yet, the apply just hangs at `aws_acm_certificate_validation` (up to its
+   > ~75-minute timeout) with no useful error. Check with
+   > `dig NS <hosted_zone_name>` that the Route53 nameservers are returned
+   > before applying.
 1. **Terraform remote state** — run `scripts/terraform/bootstrap-remote-state.sh`
    to create the state bucket (idempotent), then uncomment the `backend "s3"` block
    in each environment and `terraform init -migrate-state` (see `06-terraform.md`
@@ -108,6 +119,12 @@ automated image publishing pipeline yet).
    `cloudfront_distribution_id`, `cloudfront_domain_name`, `rds_database_endpoint`,
    `ecr_backend_repository_url`, `ecr_frontend_repository_url`,
    `acm_certificate_arn`.
+
+   > **Billing starts here.** From the moment this apply finishes, the always-on
+   > resources (EKS control plane, NAT Gateway, nodes, RDS, ALB after the first
+   > deploy) accrue cost — roughly **$6/day for idle dev**. Plan to complete the
+   > remaining bootstrap steps and the first deploy in one sitting rather than
+   > leaving a half-bootstrapped environment running for days.
 3. **ACM certificate secret** — the certificate itself is created by Terraform in
    step 2 (ACM module). Put the `acm_certificate_arn` output value in the
    `ACM_CERTIFICATE_ARN` GitHub secret; `deploy.yml` injects it into the ALB Ingress
@@ -126,9 +143,12 @@ automated image publishing pipeline yet).
    `linux/amd64`** (the EKS nodes are x86_64 `t3.*` instances — on Apple
    Silicon/ARM hosts pass `docker build --platform linux/amd64`, otherwise the
    pods crash-loop with `exec format error`; see "Local build commands" below),
-   tag them for those repositories, push, then pass the image URIs as
-   `deploy.yml` inputs. Building, tagging and pushing the images is still manual
-   — no automated image build/push pipeline exists yet (a future enhancement).
+   authenticate Docker to ECR (`aws ecr get-login-password | docker login ...` —
+   see "Pushing to ECR" below; the first push fails with `no basic auth
+   credentials` otherwise), tag them for those repositories, push, then pass the
+   image URIs as `deploy.yml` inputs. Building, tagging and pushing the images
+   is still manual — no automated image build/push pipeline exists yet (a future
+   enhancement).
 6. **ConfigMap + Secret** — create `backend-config` / `frontend-config` and
    `backend-secrets` in the `hosting-platform` namespace by running
    `scripts/deployment/bootstrap-config.sh <env>` with `DB_PASSWORD` set. It fills
@@ -432,6 +452,37 @@ the built image with the repository URI (from the `ecr_*_repository_url` outputs
 and push. Repositories use immutable tags, so push each build under a unique tag
 (e.g. the Git commit SHA). Tagging and pushing are manual — see bootstrap step 5.
 
+## Pushing to ECR
+
+Docker must **authenticate to ECR before the first push** — ECR is a private
+registry, and an unauthenticated `docker push` fails with
+`no basic auth credentials`. Exchange your AWS credentials for a registry token
+(valid ~12 hours; re-run after it expires):
+
+```bash
+AWS_REGION=<region>                      # e.g. eu-central-1, the environment's region
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+aws ecr get-login-password --region "$AWS_REGION" | \
+  docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+```
+
+Then tag and push (repository URIs come from the `ecr_backend_repository_url` /
+`ecr_frontend_repository_url` Terraform outputs; use a unique tag — the
+repositories are immutable):
+
+```bash
+TAG=$(git rev-parse --short HEAD)
+
+docker tag hosting-platform-backend:local  "<ecr_backend_repository_url>:${TAG}"
+docker tag hosting-platform-frontend:local "<ecr_frontend_repository_url>:${TAG}"
+docker push "<ecr_backend_repository_url>:${TAG}"
+docker push "<ecr_frontend_repository_url>:${TAG}"
+```
+
+These full URIs (including the tag) are what `deploy.yml` takes as its
+`backend_image` / `frontend_image` inputs.
+
 ## Assumptions and limitations
 
 * **`output: "standalone"` was added to `next.config.ts`.** It is a packaging
@@ -652,6 +703,54 @@ Run once after the first deployment (and after any node group / AMI change):
   pods directly.
 * **End-to-end build**: deploy a known-good public repository and confirm the
   published CloudFront URL serves it (see `15-demo.md` "Full AWS demo").
+
+---
+
+# First administrator (one-time bootstrap)
+
+Registration only ever grants the `User` role, and there is no self-promotion in
+the app — so the first `Admin` must be promoted **directly in the database**.
+In AWS this cannot be done from your machine: **RDS is private** (private
+subnets, VPC-only security group), and the backend image is chiseled (no shell
+to `exec` into). The supported path is a **temporary PostgreSQL client pod
+inside the cluster**, which can reach RDS because it runs in the VPC.
+
+This is a one-time bootstrap operation: do it once per environment, after the
+first deploy and after registering your own account through the UI.
+
+1. Read the connection values from the Secret the backend uses:
+
+   ```bash
+   kubectl -n hosting-platform get secret backend-secrets \
+     -o jsonpath='{.data.ConnectionStrings__DefaultConnection}' | base64 -d; echo
+   # -> Host=<rds-host>;Port=5432;Database=hostingplatform;Username=hostingplatform;Password=<password>
+   ```
+
+2. Launch a temporary psql pod with those values (it is deleted automatically
+   when you exit — `--rm`):
+
+   ```bash
+   kubectl -n hosting-platform run psql-admin --rm -it --restart=Never \
+     --image=postgres:16 --env PGPASSWORD='<password>' -- \
+     psql -h <rds-host> -p 5432 -U hostingplatform -d hostingplatform
+   ```
+
+3. Promote your account (idempotent):
+
+   ```sql
+   INSERT INTO "AspNetUserRoles" ("UserId","RoleId")
+   SELECT u."Id", r."Id" FROM "AspNetUsers" u, "AspNetRoles" r
+   WHERE u."Email" = 'YOUR_EMAIL' AND r."Name" = 'Admin'
+   ON CONFLICT DO NOTHING;
+   ```
+
+4. Exit psql (the pod is removed), then **sign out and back in** — roles are
+   read at sign-in — and open `/admin`.
+
+Notes: the password briefly exists in the pod's environment and your shell
+history — clear the history line if that matters to you
+(`history -d $(history 1 | awk '{print $1}')`). Further admins can be promoted
+the same way; a proper admin-management UI is future work.
 
 ---
 

@@ -189,6 +189,13 @@ installs both at container start before cloning and publishing. Because of this
 runtime install (`apt-get`), the build container currently **runs as root**
 while executing untrusted repository code.
 
+The image is pulled from **Docker Hub**, whose anonymous pulls are rate-limited
+per IP — and all cluster egress shares the single NAT Gateway IP. The impact is
+low at MVP scale because the image is cached on each node after its first pull
+(the pinned tag is re-used, not re-pulled), but a burst of pulls on fresh nodes
+can hit the limit. The prebuilt ECR build image below also removes this
+dependency entirely.
+
 A **prebuilt, non-root build image** (ECR) remains a planned future improvement;
 it would remove the root requirement, cut ~150 MB of per-build NAT traffic and
 1–2 minutes of install latency, and drop the build-time dependency on the

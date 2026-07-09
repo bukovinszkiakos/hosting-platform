@@ -4,5 +4,5 @@ namespace HostingPlatform.Api.DTOs;
 
 public record RegisterRequest(
     [StringLength(150)] string DisplayName,
-    string Email,
-    string Password);
+    [EmailAddress][StringLength(256)] string Email,
+    [StringLength(128)] string Password);

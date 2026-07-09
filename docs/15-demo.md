@@ -75,6 +75,10 @@ PGPASSWORD=localdev psql -h localhost -p 5432 -U hostingplatform -d hostingplatf
 
 Sign out (clear the `HostingPlatform.Auth` cookie) and sign back in, then open `/admin`.
 
+> **In AWS** the local `psql` command above does not work — RDS is private. Use
+> the temporary in-cluster psql pod procedure instead: see `16-deployment.md`
+> "First administrator (one-time bootstrap)".
+
 ## 4. Known demo caveats
 
 These are tracked in [`14-post-mvp-polish.md`](14-post-mvp-polish.md):

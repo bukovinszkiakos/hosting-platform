@@ -121,8 +121,12 @@ public class ProjectService : IProjectService
     }
 
     // The repository URL is optional at create/update (a deployment later requires
-    // one), but when provided it must be a well-formed absolute http(s) URL. This
-    // surfaces an obviously invalid URL immediately instead of at build time.
+    // one), but when provided it must be a public HTTPS github.com URL. The MVP
+    // supports only public GitHub repositories (see docs/02-features.md), so the
+    // host is restricted to github.com; this both enforces the documented contract
+    // and narrows the build Job's clone target (see docs/10-deployment-workflow.md).
+    private const string AllowedRepositoryHost = "github.com";
+
     private static void ValidateRepositoryUrl(string? repositoryUrl)
     {
         if (string.IsNullOrWhiteSpace(repositoryUrl))
@@ -131,9 +135,11 @@ public class ProjectService : IProjectService
         }
 
         if (!Uri.TryCreate(repositoryUrl, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            uri.Scheme != Uri.UriSchemeHttps ||
+            !string.Equals(uri.Host, AllowedRepositoryHost, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ValidationException("Repository URL is invalid");
+            throw new ValidationException(
+                "Repository URL must be a public HTTPS github.com URL");
         }
     }
 

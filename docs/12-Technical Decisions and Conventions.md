@@ -197,6 +197,19 @@ locked-out account — the API returns the same generic `401` (`Invalid email or
 password`) so it never reveals whether an account exists. Lockout is logged as a
 distinct Warning for observability.
 
+### Account enumeration (accepted MVP limitation)
+
+While **login** is uniform, **registration** and **profile email-update** are
+not: a duplicate email surfaces Identity's `"Email '…' is already taken"`
+message, so an attacker can enumerate which emails have accounts (the
+reconnaissance step before credential stuffing). This is an **accepted MVP
+limitation that must be addressed before real public users**, together with the
+other before-real-users items (rate limiting on the auth endpoints, per-user
+build quotas). The fix is to make these paths respond generically (e.g. a
+neutral "registration could not be completed" and/or an email-confirmation
+flow); it is deferred deliberately and is **not** an invitation to redesign
+authentication or add email verification for the MVP.
+
 ---
 
 # Authorization
@@ -339,7 +352,7 @@ Validation errors should return:
   "message": "Validation failed",
   "errors": [
     "Project name is required",
-    "Repository URL is invalid"
+    "Repository URL must be a public HTTPS github.com URL"
   ]
 }
 ```
@@ -358,12 +371,19 @@ This single shape covers both kinds of validation:
 * **String lengths** are capped with DataAnnotations (`[StringLength]`) on the
   request DTOs, so oversized input is rejected by model validation before it
   reaches a service: `Name` and `DisplayName` ≤ 150 characters, `RepositoryUrl`
-  ≤ 2048 characters.
+  ≤ 2048 characters, `Email` ≤ 256 characters, `Password` ≤ 128 characters.
+* **Email** fields (register / login / profile update) are additionally checked
+  with `[EmailAddress]`. The password length cap in particular bounds the work
+  Identity's PBKDF2 hasher does per request, so an anonymous caller cannot force
+  arbitrarily expensive hashing.
 * **Repository URL** is optional on project create/update (a deployment later
-  requires one), but when provided it must be a well-formed absolute `http`/`https`
-  URL; otherwise the service throws `ValidationException` (`Repository URL is
-  invalid`). The URL is not otherwise restricted — an unreachable or private
-  repository is still surfaced as a failed build (see `10-deployment-workflow.md`).
+  requires one), but when provided it must be a **public HTTPS `github.com`
+  URL** — the MVP supports only public GitHub repositories (see
+  `02-features.md`). Any other scheme or host throws `ValidationException`
+  (`Repository URL must be a public HTTPS github.com URL`). This enforces the
+  documented contract and restricts the build Job's clone target to GitHub. An
+  unreachable or private GitHub repository is still surfaced later as a failed
+  build (see `10-deployment-workflow.md`).
 
 ---
 
