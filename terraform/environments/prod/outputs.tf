@@ -72,3 +72,8 @@ output "ecr_frontend_repository_url" {
   description = "URI of the frontend ECR repository (tag/push images here; pass as deploy.yml frontend_image)"
   value       = module.ecr.repository_urls["frontend"]
 }
+
+output "acm_certificate_arn" {
+  description = "ARN of the validated ACM certificate for the ALB HTTPS listener (null until a domain is configured); set as the ACM_CERTIFICATE_ARN GitHub secret."
+  value       = module.acm.certificate_arn
+}

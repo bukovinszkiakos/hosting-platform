@@ -23,10 +23,11 @@ it stays a deliberate manual operation run by an operator who controls the state
 
 ```text
 Bootstrap (manual, one-time / infrequent)
+  0. Domain + Route53 hosted zone     (register a domain; create a public hosted zone; delegate registrar NS -> Route53)
   1. Terraform remote state           (terraform/backend/, then enable the S3 backend)
-  2. terraform apply <environment>    (VPC, EKS, RDS, S3, CloudFront, ECR, IAM + Pod Identity)
-  3. AWS Load Balancer Controller     (Helm install; uses the Terraform-provisioned role)
-  4. ACM certificate                  (for ALB HTTPS; requires a domain)
+  2. terraform apply <environment>    (VPC, EKS, RDS, S3, CloudFront, ECR, ACM cert, IAM + Pod Identity)
+  3. Set ACM_CERTIFICATE_ARN secret   (from the acm_certificate_arn Terraform output)
+  4. AWS Load Balancer Controller     (Helm install; uses the Terraform-provisioned role)
   5. Build & push images to ECR       (repositories created by Terraform in step 2; build/tag/push backend + frontend)
   6. Create ConfigMap + Secret        (from Terraform outputs; see the *.example.yaml)
 
@@ -35,14 +36,18 @@ Repeatable (automated — deploy.yml, workflow_dispatch)
   8. Run the database migration Job   (backend image + `migrate`; applied and awaited before rollout)
   9. Apply Services + Deployments (with the supplied image URIs) + frontend HPA
  10. Wait for the rollout
- 11. Apply the Ingress (ACM cert injected from a secret)
+ 11. Apply the Ingress (ACM cert injected from the secret)
  12. Print a deployment summary
+
+After the first deploy (one-time): point a Route53 alias record for the domain at
+the provisioned ALB (see "HTTPS, certificates and DNS").
 ```
 
 The application deploy (steps 7–12) is what `deploy.yml` automates — including the
 database migration (step 8), which runs as an idempotent one-off Job before the
-rollout (see "Database migrations" below). Steps 1–6 are the manual bootstrap
-described below.
+rollout (see "Database migrations" below). Steps 0–6 are the manual bootstrap
+described below; step 0 (domain + hosted zone) is a prerequisite of step 2 so the
+ACM certificate can be DNS-validated.
 
 ---
 
@@ -56,7 +61,7 @@ Set these at the repository level, or (preferred) on the `dev` / `prod` GitHub
 | `AWS_ACCESS_KEY_ID` | IAM credentials the workflow deploys with |
 | `AWS_SECRET_ACCESS_KEY` | " |
 | `AWS_REGION` | AWS region of the cluster (e.g. `eu-central-1`) |
-| `ACM_CERTIFICATE_ARN` | ACM certificate ARN injected into the ALB Ingress for HTTPS |
+| `ACM_CERTIFICATE_ARN` | ACM certificate ARN injected into the ALB Ingress for HTTPS — take it from the `acm_certificate_arn` Terraform output (see "HTTPS, certificates and DNS") |
 
 The workflow validates all four are present before doing anything and fails early
 with a clear message if any is missing. The IAM principal needs permission to
@@ -79,6 +84,12 @@ run. They are intentionally **not** automated (state safety, external
 dependencies, and image build/publish being a deliberate operator step — no
 automated image publishing pipeline yet).
 
+0. **Domain + Route53 hosted zone** — register a domain, create a **public Route53
+   hosted zone** for it, and delegate the registrar's nameservers to that zone.
+   Set `domain_name` (e.g. `app.example.com`) and `hosted_zone_name` (e.g.
+   `example.com`) in the environment `terraform.tfvars`. This is a prerequisite of
+   the ACM certificate created in step 2; the domain/zone stay manual on purpose
+   (see "HTTPS, certificates and DNS").
 1. **Terraform remote state** — apply `terraform/backend/` with local state to
    create the state bucket, then uncomment the `backend "s3"` block in the
    environment and `terraform init -migrate-state` (see `06-terraform.md`
@@ -86,16 +97,20 @@ automated image publishing pipeline yet).
    `terraform apply`.
 2. **Provision infrastructure** — `terraform apply` the environment
    (`terraform/environments/<env>`), providing `TF_VAR_db_password`. This also
-   creates the ECR repositories (step 5). Record the outputs (`terraform output`):
-   `eks_cluster_name`, `s3_bucket_name`, `cloudfront_distribution_id`,
-   `cloudfront_domain_name`, `rds_database_endpoint`,
-   `ecr_backend_repository_url`, `ecr_frontend_repository_url`.
-3. **AWS Load Balancer Controller** — install via Helm into `kube-system`; it uses
+   creates the ECR repositories (step 5) and — when `domain_name` is set (step 0) —
+   the DNS-validated **ACM certificate** for the ALB. Record the outputs
+   (`terraform output`): `eks_cluster_name`, `s3_bucket_name`,
+   `cloudfront_distribution_id`, `cloudfront_domain_name`, `rds_database_endpoint`,
+   `ecr_backend_repository_url`, `ecr_frontend_repository_url`,
+   `acm_certificate_arn`.
+3. **ACM certificate secret** — the certificate itself is created by Terraform in
+   step 2 (ACM module). Put the `acm_certificate_arn` output value in the
+   `ACM_CERTIFICATE_ARN` GitHub secret; `deploy.yml` injects it into the ALB Ingress
+   (the ALB terminates HTTPS; Secure cookies require it). See "HTTPS, certificates
+   and DNS".
+4. **AWS Load Balancer Controller** — install via Helm into `kube-system`; it uses
    the IAM role Terraform created (Pod Identity). Without it the Ingress cannot
    create an ALB (see `07-kubernetes.md` "Ingress").
-4. **ACM certificate** — request/validate an ACM certificate for your domain and
-   put its ARN in the `ACM_CERTIFICATE_ARN` secret (the ALB terminates HTTPS;
-   Secure cookies require it).
 5. **Container images** — the backend and frontend are containerized in-repo via
    `backend/Dockerfile` and `frontend/Dockerfile` (see "Container images" below).
    The ECR repositories are created by Terraform in step 2 (see `06-terraform.md`
@@ -195,6 +210,89 @@ and push. Repositories use immutable tags, so push each build under a unique tag
   (`07-kubernetes.md` "Backend Replicas"): a restart logs users out.
 * The images are **framework-dependent** (not self-contained / trimmed / ReadyToRun)
   to keep the build simple and avoid altering runtime behaviour.
+
+---
+
+# HTTPS, certificates and DNS
+
+## Architecture
+
+The platform's own endpoint is served over **HTTPS terminated at the ALB**, with
+the HTTP listener redirecting to HTTPS (`k8s/ingress/alb-ingress.yaml`:
+`listen-ports`, `ssl-redirect`). HTTPS is **mandatory**: the backend issues
+`Secure` session cookies in Production, which browsers drop over plain HTTP, so
+without HTTPS authentication silently breaks. The ALB presents an **ACM
+certificate** supplied via the `alb.ingress.kubernetes.io/certificate-arn`
+annotation, which `deploy.yml` fills from the `ACM_CERTIFICATE_ARN` secret at
+apply time. (Published user sites are separate — CloudFront serves them over HTTPS
+with its own default certificate.)
+
+## ACM certificate process
+
+The certificate is **created and DNS-validated by Terraform** (ACM module, see
+`06-terraform.md`), not by hand in the console:
+
+* Set `domain_name` + `hosted_zone_name` in the environment `terraform.tfvars`.
+* `terraform apply` creates the certificate, writes the Route53 validation records
+  into the hosted zone, and waits until the certificate is **Issued**.
+* Read the ARN from the `acm_certificate_arn` output and store it in the
+  `ACM_CERTIFICATE_ARN` GitHub secret.
+
+The certificate is **regional** (issued in the ALB's region, e.g. `eu-central-1`) —
+not `us-east-1`, which is only for CloudFront.
+
+## Domain requirements
+
+A **custom domain is required** — ACM cannot issue a public certificate for an
+AWS-owned `*.elb.amazonaws.com` name. Registering the domain is an external
+purchase and is intentionally **not** managed by Terraform.
+
+## DNS configuration
+
+* **Hosted zone (manual, one-time).** Create a **public Route53 hosted zone** for
+  the domain and delegate the registrar's nameservers to it. Terraform reads this
+  zone via a data source; keeping zone creation + registrar delegation manual lets
+  a single `terraform apply` both create and validate the certificate (a
+  Terraform-created zone would need a two-phase apply: create zone → delegate NS →
+  then validation can pass). This is a deliberate MVP boundary.
+* **Validation records (automatic).** Terraform manages the ACM `_acme`-style
+  CNAME validation records in the zone.
+* **ALB alias record (manual, one-time, post-deploy).** After the first deploy
+  creates the ALB, add a Route53 **A/AAAA alias** record for `domain_name`
+  pointing at the ALB (its hostname is in the deploy summary, or
+  `kubectl -n hosting-platform get ingress hosting-platform`). This is manual
+  because the ALB is created by the AWS Load Balancer Controller, not Terraform, so
+  its hostname is unknown at infra-apply time. The ALB hostname is stable across
+  redeploys (as long as the Ingress is not deleted), so this is a one-time step.
+  Automating it with **`external-dns`** is the documented future improvement.
+
+## ALB integration
+
+`deploy.yml` applies the Ingress last, substituting the real ARN:
+`sed "s#REPLACE_WITH_ACM_CERTIFICATE_ARN#${ACM_CERTIFICATE_ARN}#" ... | kubectl apply`.
+The Ingress carries no host rule, so it also answers on the raw ALB hostname during
+testing; the ACM certificate is presented on the HTTPS listener regardless.
+
+## Bootstrap sequence (HTTPS-specific)
+
+1. Register the domain; create the public hosted zone; delegate registrar NS.
+2. Set `domain_name` + `hosted_zone_name`; `terraform apply`; the certificate is
+   issued.
+3. Put `acm_certificate_arn` into the `ACM_CERTIFICATE_ARN` secret.
+4. First `deploy.yml` run provisions the ALB and applies the Ingress with the cert.
+5. Add the Route53 alias record → ALB. HTTPS on the custom domain is now live.
+
+## Operational procedure and renewal
+
+* **Renewal is automatic.** DNS-validated ACM certificates renew themselves as long
+  as the validation records (managed by Terraform) remain in the zone. There is no
+  expiry step to run and no cron.
+* **Changing the domain** — update `domain_name`/`hosted_zone_name`, `terraform
+  apply`, update the `ACM_CERTIFICATE_ARN` secret and the alias record, and
+  re-run `deploy.yml`.
+* **No manual AWS Console steps** are required for the certificate itself; the only
+  manual actions are the domain purchase, the hosted zone + registrar delegation,
+  and the one-time ALB alias record — all outside the certificate lifecycle.
 
 ---
 

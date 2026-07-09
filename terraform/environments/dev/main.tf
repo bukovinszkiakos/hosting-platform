@@ -94,3 +94,13 @@ module "ecr" {
   # hold images (mirrors the RDS skip_final_snapshot posture).
   force_delete = true
 }
+
+module "acm" {
+  source = "../../modules/acm"
+
+  # DNS-validated ACM certificate for the ALB's HTTPS listener. Disabled until a
+  # domain is supplied (domain_name/hosted_zone_name in terraform.tfvars); see
+  # docs/16-deployment.md "HTTPS, certificates and DNS".
+  domain_name      = var.domain_name
+  hosted_zone_name = var.hosted_zone_name
+}

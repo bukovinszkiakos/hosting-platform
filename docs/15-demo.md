@@ -99,7 +99,9 @@ This cannot be exercised locally. To show a real build publishing a live site:
 
 1. **Provision infrastructure** (see [`../terraform/README.md`](../terraform/README.md)):
    bootstrap remote state, then `terraform apply` an environment (creates VPC, EKS,
-   RDS, S3, CloudFront, IAM + Pod Identity).
+   RDS, S3, CloudFront, ECR, IAM + Pod Identity, and — when a domain is configured —
+   the ACM certificate for HTTPS; see `16-deployment.md` "HTTPS, certificates and
+   DNS").
 2. **Build & push images** for the backend and frontend to ECR; set the image URIs
    in the Kubernetes Deployments.
 3. **Create the ConfigMap + Secret** (from Terraform outputs — see
@@ -110,7 +112,8 @@ This cannot be exercised locally. To show a real build publishing a live site:
    runs the database migration Job (backend image + `migrate`) to create/upgrade
    the schema on RDS before rollout — there is no auto-migrate on startup — then
    rolls out the app. See `16-deployment.md` "Database migrations".
-5. **Demo**: open the platform via the ALB Ingress hostname, create a project with a
+5. **Demo**: open the platform over HTTPS at the custom domain (or the raw ALB
+   hostname for a quick check), create a project with a
    real public GitHub repo, click Deploy, and watch it reach **Online**; open the
    generated CloudFront URL (`https://<domain>/<userId>/<projectId>`) to show the
    live site.

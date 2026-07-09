@@ -59,3 +59,15 @@ variable "hosting_bucket_name" {
     error_message = "hosting_bucket_name must be a valid S3 bucket name."
   }
 }
+
+variable "domain_name" {
+  type        = string
+  description = "Fully-qualified domain for the platform's public HTTPS endpoint (e.g. app.example.com). Empty (default) disables ACM/DNS so the environment applies before a domain is available."
+  default     = ""
+}
+
+variable "hosted_zone_name" {
+  type        = string
+  description = "Name of the existing public Route53 hosted zone authoritative for domain_name (e.g. example.com). Required when domain_name is set."
+  default     = ""
+}

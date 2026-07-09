@@ -36,10 +36,16 @@ AWS
 │
 ├── ECR
 │
+├── ACM (ALB certificate)
+│
 ├── IAM
 │
 └── Terraform State Bucket
 ```
+
+> **Route53** hosts the DNS zone for the platform's custom domain. It is an AWS
+> service but is **not** created by Terraform (see "HTTPS and Custom Domain" and
+> `06-terraform.md` "ACM Module" for the boundary), so it is not shown above.
 
 ---
 
@@ -234,6 +240,46 @@ the NAT Gateway.
 
 ---
 
+# HTTPS and Custom Domain
+
+The platform's own web endpoint (frontend + `/api`) is served over **HTTPS
+terminated at the Application Load Balancer**. HTTPS is mandatory, not optional:
+the backend issues `Secure` session cookies in Production, which browsers drop over
+plain HTTP, so serving the app over HTTP would silently break authentication. The
+ALB's HTTP listener redirects to HTTPS.
+
+## Certificate
+
+HTTPS at the ALB needs an **ACM certificate in the ALB's region** (not
+`us-east-1`, which is only for CloudFront). The certificate is **DNS-validated**
+and provisioned by Terraform (see `06-terraform.md` "ACM Module"): Terraform
+creates the certificate and the Route53 validation records and waits until the
+certificate is issued. DNS validation means the certificate **auto-renews** with no
+operator action as long as the validation records remain.
+
+## Domain and DNS
+
+A custom domain is required (an ACM public certificate cannot be issued for an
+AWS-owned `*.elb.amazonaws.com` name). The domain and its Route53 **public hosted
+zone** are an operator prerequisite:
+
+* **Domain registration** and **registrar → Route53 nameserver delegation** are
+  external, one-time, manual steps (a domain is a purchase; delegation is done at
+  the registrar). Terraform consumes the existing hosted zone via a data source.
+* After the first deployment creates the ALB, an **alias record** for the domain is
+  pointed at the ALB. The ALB is created by the AWS Load Balancer Controller (not
+  Terraform), so this record is added once, post-deploy (see
+  `16-deployment.md` "HTTPS, certificates and DNS"; `external-dns` is the future
+  automation).
+
+## Relationship to CloudFront
+
+This is separate from the **published user sites**, which are served by CloudFront
+over HTTPS using its default `*.cloudfront.net` certificate. Only the platform's own
+endpoint uses the ACM certificate + custom domain described here.
+
+---
+
 # NAT Gateway
 
 Provides internet access for resources running inside private subnets.
@@ -310,8 +356,10 @@ The platform follows the following principles:
 Future versions may include:
 
 * AWS Secrets Manager
-* Route53
-* Custom Domains
+* `external-dns` to manage the ALB Route53 alias record automatically (today it is
+  a one-time manual record — see "HTTPS and Custom Domain")
+* Terraform-managed Route53 hosted zone (today the zone + registrar delegation are
+  a manual prerequisite)
 * CloudWatch Monitoring
 * Advanced Auto Scaling
 * Multiple Environments (Dev / Stage / Prod)

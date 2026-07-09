@@ -347,8 +347,13 @@ browsers drop over plain HTTP — so serving the app over HTTP would silently br
 authentication. HTTPS on the ALB needs an **ACM certificate** (and therefore a
 domain), supplied via the `certificate-arn` annotation. This makes a domain + ACM
 a production prerequisite for the application endpoint (published sites already
-get HTTPS via CloudFront). Custom domains were previously listed as a future item;
-for the app's own endpoint HTTPS is required.
+get HTTPS via CloudFront).
+
+The ACM certificate is DNS-validated and created by Terraform (see
+`06-terraform.md` "ACM Module"); its ARN is stored in the `ACM_CERTIFICATE_ARN`
+secret and `deploy.yml` injects it into this annotation at apply time. The domain's
+Route53 hosted zone and the post-deploy alias record pointing at the ALB are manual
+one-time steps — see `16-deployment.md` "HTTPS, certificates and DNS".
 
 ## Architecture
 

@@ -14,6 +14,8 @@ terraform/
 │   ├── rds/                 # PostgreSQL, subnet group, security group
 │   ├── s3/                  # Static-site hosting bucket + public-read policy
 │   ├── cloudfront/          # CDN/HTTPS distribution + index.html rewrite function
+│   ├── ecr/                 # Backend + frontend container image repositories (scan on push, lifecycle policy)
+│   ├── acm/                 # DNS-validated ACM certificate for the ALB HTTPS listener (gated on domain_name)
 │   └── iam/                 # Backend + ALB Controller IAM roles (least privilege) + Pod Identity associations
 └── environments/
     ├── dev/                 # Cost-minimized development environment
@@ -42,6 +44,11 @@ export TF_VAR_db_password="<strong-password>"
 
 `hosting_bucket_name` in `terraform.tfvars` must be globally unique across all of
 AWS S3 — adjust it if the default name is taken.
+
+To enable HTTPS on the platform's ALB endpoint, set `domain_name` and
+`hosted_zone_name` in `terraform.tfvars` (an existing public Route53 hosted zone is
+required — see `docs/16-deployment.md` "HTTPS, certificates and DNS"). Left empty
+(the default), the ACM module is a no-op and the environment still applies.
 
 ### 1. Bootstrap remote state (once per AWS account)
 
