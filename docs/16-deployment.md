@@ -122,10 +122,13 @@ automated image publishing pipeline yet).
    `backend/Dockerfile` and `frontend/Dockerfile` (see "Container images" below).
    The ECR repositories are created by Terraform in step 2 (see `06-terraform.md`
    "ECR Module"); take their URIs from the `ecr_backend_repository_url` /
-   `ecr_frontend_repository_url` outputs. Build both images, tag them for those
-   repositories, push, then pass the image URIs as `deploy.yml` inputs. Building,
-   tagging and pushing the images is still manual — no automated image build/push
-   pipeline exists yet (a future enhancement).
+   `ecr_frontend_repository_url` outputs. Build both images **for
+   `linux/amd64`** (the EKS nodes are x86_64 `t3.*` instances — on Apple
+   Silicon/ARM hosts pass `docker build --platform linux/amd64`, otherwise the
+   pods crash-loop with `exec format error`; see "Local build commands" below),
+   tag them for those repositories, push, then pass the image URIs as
+   `deploy.yml` inputs. Building, tagging and pushing the images is still manual
+   — no automated image build/push pipeline exists yet (a future enhancement).
 6. **ConfigMap + Secret** — create `backend-config` / `frontend-config` and
    `backend-secrets` in the `hosting-platform` namespace by running
    `scripts/deployment/bootstrap-config.sh <env>` with `DB_PASSWORD` set. It fills
@@ -398,10 +401,18 @@ expect, so the images are drop-in for `k8s/backend` and `k8s/frontend`.
 
 ## Local build commands
 
+The EKS node group runs on **x86_64** (`t3.*` instances), so every image pushed
+to ECR must be built for `linux/amd64`. On an x86_64 host this is the default;
+on **Apple Silicon or any other ARM64 host** the platform must be forced with
+`--platform linux/amd64` — an ARM image builds and pushes cleanly but the pods
+then crash-loop with `exec format error`. The commands below always pass the
+flag so they are correct on any host. (Only exception: an image built purely
+for a local smoke test on an ARM machine may be built natively.)
+
 ```bash
 # From the repository root. The build context is each app's own directory.
-docker build -t hosting-platform-backend:local  backend/
-docker build -t hosting-platform-frontend:local frontend/
+docker build --platform linux/amd64 -t hosting-platform-backend:local  backend/
+docker build --platform linux/amd64 -t hosting-platform-frontend:local frontend/
 
 # Optional smoke test (no AWS needed):
 #   frontend — serves on http://localhost:3000
@@ -587,8 +598,10 @@ instance, but the in-cluster Job is the supported path.
   re-deploying a previous image) reverts the application but **not** the schema.
 * Prefer **backward-compatible ("expand/contract") migrations**: additive changes
   first, so the previous app version keeps working against the new schema and a
-  code rollback is safe without a schema rollback. This also covers the brief
-  window during a rollout where an old and a new pod may both run.
+  code rollback is safe without a schema rollback. It also covers the window
+  between the migration Job completing and the new backend pod starting (the
+  backend uses `strategy: Recreate`, so old and new pods never overlap — but the
+  **old** pod runs against the **new** schema during that window).
 * For a destructive schema change that must be undone, roll back deliberately with
   a new "down" migration (authored and applied as a normal forward migration) or
   restore RDS from a snapshot — never hand-edit an applied migration
@@ -644,6 +657,30 @@ Run once after the first deployment (and after any node group / AMI change):
 
 # Rollback strategy
 
+## Backend deploys are brief outages by design (Recreate)
+
+The backend Deployment uses `strategy: Recreate`, not a rolling update: the old
+pod is terminated **before** the new one starts. Consequences to have in mind
+during any deploy or incident:
+
+* Every backend deploy causes a **short API outage** (seconds — until the new
+  pod passes its readiness probe). This is intentional.
+* If a backend rollout **fails** (bad image, crash-loop), there is **no old pod
+  still serving** — the API is down until you intervene. `deploy.yml` turns red
+  at the rollout-wait step, but it does not revert anything.
+* Recovery is manual: `kubectl -n hosting-platform rollout undo
+  deployment/backend`, or re-run `deploy.yml` with the last known-good image URI.
+
+Why this trade-off is accepted: a rolling update would briefly run **two**
+backend pods, which violates the single-replica invariant the MVP depends on —
+the new pod's startup recovery would mark deployments `Failed` while the old pod
+is still driving them, and the pods cannot decrypt each other's session cookies
+(ephemeral Data Protection keys). Correctness of the deployment pipeline is
+prioritized over a few seconds of deploy-time availability. The frontend is
+unaffected (stateless, rolling update, HPA-managed).
+
+## Rollback options
+
 * **Fast rollback** — `kubectl -n hosting-platform rollout undo deployment/backend`
   (and `deployment/frontend`) reverts to the previous ReplicaSet/image.
 * **Re-deploy a known-good image** — re-run `deploy.yml` with the previous image
@@ -666,6 +703,8 @@ Run once after the first deployment (and after any node group / AMI change):
   "Configuration and secrets bootstrap".
 * **Single-replica backend.** The backend has no HPA (in-memory queue +
   ephemeral Data Protection keys); see `07-kubernetes.md` "Backend Replicas".
+* **Backend deploys briefly interrupt the API** (`strategy: Recreate`), and a
+  failed backend rollout leaves no old pod serving — see "Rollback strategy".
 * **Migrations are not auto-reverted.** They are applied automatically before each
   rollout (idempotent Job), but a code rollback does not roll back the schema —
   prefer backward-compatible migrations (see "Database migrations").

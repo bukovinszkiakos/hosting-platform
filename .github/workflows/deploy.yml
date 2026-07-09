@@ -105,6 +105,21 @@ jobs:
           done
           echo "ConfigMap and Secret are present."
 
+      - name: Verify AWS Load Balancer Controller is installed
+        run: |
+          set -euo pipefail
+          # The Ingress applied at the end of this workflow only provisions an ALB
+          # if the AWS Load Balancer Controller is running in the cluster (one-time
+          # bootstrap step 4, see docs/16-deployment.md "AWS Load Balancer
+          # Controller"). Without it, applying the Ingress SUCCEEDS silently and no
+          # ALB is ever created — the deploy would go green with an unreachable
+          # platform. Fail fast instead, like the ConfigMap/Secret check above.
+          if ! kubectl -n kube-system get deployment aws-load-balancer-controller >/dev/null 2>&1; then
+            echo "::error::AWS Load Balancer Controller is not installed (no deployment/aws-load-balancer-controller in kube-system). The Ingress cannot provision an ALB without it. Run scripts/deployment/install-alb-controller.sh ${{ inputs.environment }} (bootstrap step 4, docs/16-deployment.md)."
+            exit 1
+          fi
+          echo "AWS Load Balancer Controller is installed."
+
       - name: Run database migrations
         env:
           BACKEND_IMAGE: ${{ inputs.backend_image }}
