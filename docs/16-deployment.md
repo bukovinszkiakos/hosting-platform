@@ -29,18 +29,20 @@ Bootstrap (manual, one-time / infrequent)
   4. ACM certificate                  (for ALB HTTPS; requires a domain)
   5. Build & push images to ECR       (repositories created by Terraform in step 2; build/tag/push backend + frontend)
   6. Create ConfigMap + Secret        (from Terraform outputs; see the *.example.yaml)
-  7. Apply the database schema         (dotnet ef / one-off migration Job)
 
 Repeatable (automated — deploy.yml, workflow_dispatch)
-  8. Apply namespace / service account / RBAC
+  7. Apply namespace / service account / RBAC
+  8. Run the database migration Job   (backend image + `migrate`; applied and awaited before rollout)
   9. Apply Services + Deployments (with the supplied image URIs) + frontend HPA
  10. Wait for the rollout
  11. Apply the Ingress (ACM cert injected from a secret)
  12. Print a deployment summary
 ```
 
-The application deploy (steps 8–12) is what `deploy.yml` automates. Steps 1–7 are
-the manual bootstrap described below.
+The application deploy (steps 7–12) is what `deploy.yml` automates — including the
+database migration (step 8), which runs as an idempotent one-off Job before the
+rollout (see "Database migrations" below). Steps 1–6 are the manual bootstrap
+described below.
 
 ---
 
@@ -107,9 +109,10 @@ automated image publishing pipeline yet).
    outputs and the DB connection string, using
    `k8s/base/configmap.example.yaml` and `k8s/secrets/secret.example.yaml` as
    templates. `deploy.yml` verifies these exist and fails early if not.
-7. **Database schema** — RDS lives in private subnets and there is no
-   auto-migrate on startup, so apply migrations manually (`dotnet ef database
-   update` via a bastion/port-forward, or a one-off in-cluster migration Job).
+> **Database schema** — no longer a manual bootstrap step. Migrations are applied
+> in-cluster by the migration Job that `deploy.yml` runs before every rollout (see
+> "Database migrations" below). The bootstrap only has to ensure the ConfigMap and
+> Secret (step 6) exist, since the Job reads the connection string from them.
 
 ---
 
@@ -195,6 +198,83 @@ and push. Repositories use immutable tags, so push each build under a unique tag
 
 ---
 
+# Database migrations
+
+## Strategy
+
+Schema changes are applied by a **one-off Kubernetes Job that runs the backend
+image itself** (`k8s/jobs/migrate-job.yaml`). The backend has a dedicated startup
+path — `dotnet HostingPlatform.Api.dll migrate` (see `backend/.../Program.cs`) —
+that applies pending EF Core migrations (`Database.Migrate()`) and exits without
+starting the web server. The Job runs that command as a Pod, using the same
+`backend-config` / `backend-secrets` the app uses (so it gets the same RDS
+connection string).
+
+Why this approach (and not the alternatives):
+
+* **Reuses the release image.** The migrations are compiled into the backend
+  assembly, so the Job runs the *exact* image being deployed — the schema can
+  never drift from the code. No separate SDK image, `dotnet ef` tooling, or
+  migration-bundle artifact is needed (the chiseled runtime image has no SDK).
+* **Not on app startup.** The app never migrates automatically on boot, so
+  ordinary pod restarts and (future) multiple replicas never race to migrate and
+  never apply schema changes as a side effect of scaling.
+* **Single runner, no race.** Exactly one Job Pod runs the migration; EF Core also
+  wraps each migration in a transaction and records it in `__EFMigrationsHistory`,
+  so re-runs are **idempotent** no-ops.
+* **Fits the cluster and the workflow.** It is a plain `batch/v1` Job in the
+  existing namespace, run by the existing deploy pipeline.
+
+## How it runs (first and subsequent deploys)
+
+`deploy.yml` runs the Job **before** the application rollout, on every deploy:
+
+1. delete any previous `db-migrate` Job (Jobs are immutable), then apply
+   `migrate-job.yaml` with the deployed **backend image URI** substituted in;
+2. wait for the Job to reach `Complete` (polling its conditions, so a `Failed`
+   Job ends the deploy immediately and dumps the Job logs);
+3. only then apply the Services/Deployments and wait for the rollout.
+
+* **First deployment** — the database is empty. The Job applies `InitialCreate`,
+  creating the full schema. The backend then starts and seeds the Identity roles
+  (`User`, `Admin`) against the now-existing tables. Without this ordering the
+  backend would crash on startup (role seeding needs the schema).
+* **Subsequent deployments** — the Job applies only migrations added since the
+  last deploy; if there are none, it is a no-op and the deploy proceeds. Because
+  the Job uses the new image, code and schema are always rolled out together.
+
+## Manual / bootstrap procedure
+
+The same Job can be run by hand (e.g. to apply a schema change without a full
+deploy, or during bootstrap verification):
+
+```bash
+kubectl -n hosting-platform delete job db-migrate --ignore-not-found
+sed 's#image: "PLACEHOLDER".*#image: "<backend-image-uri>"#' \
+  k8s/jobs/migrate-job.yaml | kubectl apply -f -
+kubectl -n hosting-platform wait --for=condition=complete job/db-migrate --timeout=300s
+kubectl -n hosting-platform logs job/db-migrate
+```
+
+As a last-resort fallback, migrations can still be applied with
+`dotnet ef database update` over a bastion/port-forward to the private RDS
+instance, but the in-cluster Job is the supported path.
+
+## Rollback considerations
+
+* EF Core migrations are **not auto-reverted**. A code rollback (`rollout undo` or
+  re-deploying a previous image) reverts the application but **not** the schema.
+* Prefer **backward-compatible ("expand/contract") migrations**: additive changes
+  first, so the previous app version keeps working against the new schema and a
+  code rollback is safe without a schema rollback. This also covers the brief
+  window during a rollout where an old and a new pod may both run.
+* For a destructive schema change that must be undone, roll back deliberately with
+  a new "down" migration (authored and applied as a normal forward migration) or
+  restore RDS from a snapshot — never hand-edit an applied migration
+  (`12-...` "Migrations").
+
+---
+
 # Running a deployment
 
 Actions → **Deploy (manual)** → *Run workflow*, then provide:
@@ -203,9 +283,10 @@ Actions → **Deploy (manual)** → *Run workflow*, then provide:
 * **backend_image** — full image URI (e.g. `…dkr.ecr.<region>.amazonaws.com/hosting-platform-<env>-backend:<tag>`)
 * **frontend_image** — full image URI
 
-The workflow configures kubectl for `hosting-platform-<env>-eks`, applies the
-manifests, waits for the backend and frontend rollouts, applies the Ingress, and
-writes a summary (including the ALB hostname once provisioned).
+The workflow configures kubectl for `hosting-platform-<env>-eks`, applies the base
+resources, runs the database migration Job to completion, applies the manifests,
+waits for the backend and frontend rollouts, applies the Ingress, and writes a
+summary (including the ALB hostname once provisioned).
 
 ---
 
@@ -225,12 +306,14 @@ writes a summary (including the ALB hostname once provisioned).
 # Limitations
 
 * **App deploy only.** `deploy.yml` does not provision infrastructure, build
-  images, install the load balancer controller, create the ConfigMap/Secret, or
-  run migrations — those are the manual bootstrap above.
+  images, install the load balancer controller, or create the ConfigMap/Secret —
+  those are the manual bootstrap above. It *does* apply database migrations, via
+  the pre-rollout migration Job (see "Database migrations").
 * **Long-lived AWS keys** (OIDC recommended later — see the security note).
 * **Single-replica backend.** The backend has no HPA (in-memory queue +
   ephemeral Data Protection keys); see `07-kubernetes.md` "Backend Replicas".
-* **Migrations are manual** and must be applied before/with a deploy that changes
-  the schema.
+* **Migrations are not auto-reverted.** They are applied automatically before each
+  rollout (idempotent Job), but a code rollback does not roll back the schema —
+  prefer backward-compatible migrations (see "Database migrations").
 * **Verified locally by structure only.** The workflow's live behavior (kubectl
   access, ALB provisioning, rollout) can only be confirmed against a real cluster.

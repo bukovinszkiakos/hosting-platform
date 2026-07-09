@@ -102,12 +102,14 @@ This cannot be exercised locally. To show a real build publishing a live site:
    RDS, S3, CloudFront, IAM + Pod Identity).
 2. **Build & push images** for the backend and frontend to ECR; set the image URIs
    in the Kubernetes Deployments.
-3. **Apply Kubernetes manifests** (`k8s/`): namespace, the `hosting-platform`
-   ServiceAccount, ConfigMap + Secret (from Terraform outputs — see
-   `k8s/base/configmap.example.yaml`, `k8s/secrets/secret.example.yaml`),
-   Deployments, Services, Ingress, HPAs.
-4. **Apply the database schema** to RDS (`dotnet ef database update`, or a one-off
-   migration Job) — there is no auto-migrate on startup.
+3. **Create the ConfigMap + Secret** (from Terraform outputs — see
+   `k8s/base/configmap.example.yaml`, `k8s/secrets/secret.example.yaml`). The rest
+   of the manifests (namespace, ServiceAccount, Deployments, Services, Ingress,
+   HPAs) are applied by `deploy.yml`.
+4. **Run the deploy workflow** (`deploy.yml`), which applies the base resources,
+   runs the database migration Job (backend image + `migrate`) to create/upgrade
+   the schema on RDS before rollout — there is no auto-migrate on startup — then
+   rolls out the app. See `16-deployment.md` "Database migrations".
 5. **Demo**: open the platform via the ALB Ingress hostname, create a project with a
    real public GitHub repo, click Deploy, and watch it reach **Online**; open the
    generated CloudFront URL (`https://<domain>/<userId>/<projectId>`) to show the

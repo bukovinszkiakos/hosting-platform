@@ -43,6 +43,7 @@ hosting-platform
 ├── Frontend Service
 ├── Backend Service
 ├── Build Jobs
+├── Database Migration Job (one-off)
 ├── ServiceAccount
 ├── RBAC (Role + RoleBinding for the backend)
 ├── ConfigMaps
@@ -217,6 +218,26 @@ Memory: 1Gi
 CPU: 2000m
 Memory: 2Gi
 ```
+
+---
+
+# Database Migration Job
+
+Database schema changes are applied by a one-off Job (`k8s/jobs/migrate-job.yaml`),
+**not** on application startup. The Job runs the backend image with the `migrate`
+argument (`dotnet HostingPlatform.Api.dll migrate`), which applies pending EF Core
+migrations and exits; it reads the RDS connection string from the same
+`backend-secrets`/`backend-config` the backend uses.
+
+`deploy.yml` runs this Job to completion **before** rolling out the application, on
+every deploy, so the schema always exists and matches the code before the backend
+starts (the backend seeds Identity roles on startup and would fail against a
+missing schema). Migrations are idempotent, so the Job is a safe no-op when there
+is nothing to apply. The Job sets `restartPolicy: Never`, `backoffLimit: 1`,
+`activeDeadlineSeconds: 300`, and `ttlSecondsAfterFinished: 600`, and runs with
+`automountServiceAccountToken: false` (it needs only the database, not the
+Kubernetes API or AWS). See `16-deployment.md` "Database migrations" for the full
+procedure and rollback considerations.
 
 ---
 

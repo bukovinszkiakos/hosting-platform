@@ -239,7 +239,8 @@ backend/
 
 ```text id="v5mkk3"
 jobs/
-└── build-job.yaml
+├── build-job.yaml     # reference template; created programmatically by the backend
+└── migrate-job.yaml   # one-off EF Core migration Job (run by deploy.yml before rollout)
 ```
 
 ---

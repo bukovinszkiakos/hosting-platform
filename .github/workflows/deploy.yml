@@ -5,10 +5,11 @@ name: Deploy (manual)
 # Scope: deploy the application to an ALREADY-PROVISIONED EKS cluster (apply the
 # Kubernetes manifests and wait for the rollout). Infrastructure provisioning
 # (`terraform apply`), container image build/push, the AWS Load Balancer Controller
-# install, the ACM certificate, the ConfigMap/Secret, and database migrations are
-# one-time bootstrap steps performed manually — see docs/16-deployment.md. This
-# keeps the automated path safe and idempotent and avoids running state-sensitive
-# `terraform apply` from an ephemeral runner.
+# install, the ACM certificate, and the ConfigMap/Secret are one-time bootstrap steps
+# performed manually — see docs/16-deployment.md. This keeps the automated path safe
+# and idempotent and avoids running state-sensitive `terraform apply` from an
+# ephemeral runner. Database migrations ARE applied here, as an idempotent one-off Job
+# run before the rollout (see the "Run database migrations" step).
 on:
   workflow_dispatch:
     inputs:
@@ -103,6 +104,39 @@ jobs:
             fi
           done
           echo "ConfigMap and Secret are present."
+
+      - name: Run database migrations
+        env:
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+        run: |
+          set -euo pipefail
+          # Apply pending EF Core migrations with a one-off Job that runs the SAME
+          # backend image being deployed (`dotnet HostingPlatform.Api.dll migrate`),
+          # BEFORE rolling out the app, so the schema always matches the new code and
+          # the backend (which seeds Identity roles on startup) never starts against a
+          # missing/stale schema. Migrations are idempotent, so this is safe on every
+          # deploy. Jobs are immutable, so any previous run is deleted before re-applying.
+          kubectl -n "$NAMESPACE" delete job db-migrate --ignore-not-found
+          sed "s#image: \"PLACEHOLDER\".*#image: \"${BACKEND_IMAGE}\"#" k8s/jobs/migrate-job.yaml | kubectl apply -f -
+          # Poll the Job's conditions so a failure ends the deploy promptly (respecting
+          # backoffLimit) instead of waiting out the whole timeout.
+          for _ in $(seq 1 66); do  # ~330s at 5s intervals (> the Job activeDeadlineSeconds)
+            complete=$(kubectl -n "$NAMESPACE" get job/db-migrate -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || true)
+            failed=$(kubectl -n "$NAMESPACE" get job/db-migrate -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || true)
+            if [ "$complete" = "True" ]; then
+              echo "Database migrations applied."
+              exit 0
+            fi
+            if [ "$failed" = "True" ]; then
+              echo "::error::Database migration failed. Recent logs:"
+              kubectl -n "$NAMESPACE" logs job/db-migrate --tail=200 || true
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::Timed out waiting for the database migration. Recent logs:"
+          kubectl -n "$NAMESPACE" logs job/db-migrate --tail=200 || true
+          exit 1
 
       - name: Deploy services and workloads
         env:

@@ -117,6 +117,21 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// One-off database migration mode: `dotnet HostingPlatform.Api.dll migrate` applies
+// any pending EF Core migrations and exits WITHOUT starting the web server. It is run
+// by the database migration Job before the app rolls out (see k8s/jobs/migrate-job.yaml
+// and docs/16-deployment.md "Database migrations"). Normal startup never migrates
+// automatically — schema changes are applied only by this explicit, single-run step,
+// so pods never race to migrate and the schema is guaranteed to exist before the app
+// (which seeds Identity roles on startup) begins serving.
+if (args.Contains("migrate"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+    return;
+}
+
 await app.SeedRolesAsync();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();

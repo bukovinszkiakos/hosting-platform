@@ -1,0 +1,47 @@
+# Database migration Job. Runs the backend image with the `migrate` argument, which
+# applies any pending EF Core migrations and exits (see backend Program.cs and
+# docs/16-deployment.md "Database migrations"). It runs BEFORE the backend rolls out
+# — automatically by deploy.yml on every deploy, and manually during bootstrap — so
+# the schema always exists and matches the code before the app starts (the backend
+# seeds Identity roles on startup and would fail against a missing schema). Migrations
+# are idempotent, so re-running the Job is a safe no-op.
+#
+# The image is set at apply time: deploy.yml substitutes the SAME backend image URI it
+# deploys, so the migration always matches the code being released. The checked-in
+# value is a placeholder (kept in sync with k8s/backend/deployment.yaml).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  namespace: hosting-platform
+  labels:
+    app: hosting-platform-db-migrate
+spec:
+  backoffLimit: 1 # one retry to ride out a transient DB blip; a real failure fails the deploy
+  ttlSecondsAfterFinished: 600 # auto-remove the finished Job after 10 minutes
+  activeDeadlineSeconds: 300 # migrations are fast; fail rather than hang the deploy
+  template:
+    metadata:
+      labels:
+        app: hosting-platform-db-migrate
+    spec:
+      restartPolicy: Never
+      # The migration only needs the database connection string (from backend-secrets);
+      # it never calls the Kubernetes API or AWS, so no API token is mounted.
+      automountServiceAccountToken: false
+      containers:
+        - name: migrate
+          image: "PLACEHOLDER" # deploy.yml substitutes the backend image URI
+          args: ["migrate"] # appended to the entrypoint: dotnet HostingPlatform.Api.dll migrate
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

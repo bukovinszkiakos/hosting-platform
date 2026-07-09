@@ -244,6 +244,10 @@ Manual database modifications should be avoided.
 
 Applied migrations should never be modified.
 
+In deployed environments, migrations are applied by a one-off Kubernetes Job that
+runs the backend image with the `migrate` argument, before the application rolls
+out — never on application startup. See `16-deployment.md` "Database migrations".
+
 ---
 
 # API Conventions
