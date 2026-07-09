@@ -156,10 +156,17 @@ Remote state must be enabled before the first production apply (otherwise state,
 including the RDS password, stays in a local file with no locking). Because the
 backend bucket must exist before it can hold state:
 
-1. `terraform apply` the `terraform/backend/` config with local state to create
-   the state bucket.
-2. Uncomment the `backend "s3"` block in each environment (`use_lockfile = true`).
-3. Run `terraform init -migrate-state` to move local state into S3.
+1. Create the state bucket: `scripts/terraform/bootstrap-remote-state.sh` (runs
+   `terraform apply` in `terraform/backend/` with local state; idempotent).
+2. Uncomment the `backend "s3"` block in each environment (`use_lockfile = true`),
+   using the bucket name/region the script prints.
+3. Run `terraform init -migrate-state` per environment to move local state into S3.
+
+The state bucket has versioning + encryption + a public-access block, and
+`prevent_destroy` so it cannot be deleted accidentally. `terraform/backend/` itself
+uses **local state** (it cannot hold its own state in the bucket it creates). See
+`terraform/README.md` "Remote state bootstrap" for the full operator runbook,
+including recovery and intentional teardown.
 
 ---
 

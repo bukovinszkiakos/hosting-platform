@@ -278,6 +278,7 @@ scripts/
 │   ├── install-alb-controller.sh   # one-time: install the AWS Load Balancer Controller (Helm) reusing the Terraform IAM role
 │   └── bootstrap-config.sh         # create backend/frontend ConfigMaps + backend Secret from Terraform outputs
 └── terraform/
+    └── bootstrap-remote-state.sh   # one-time: create the S3 remote-state bucket, then guide backend enablement
 ```
 
 ---

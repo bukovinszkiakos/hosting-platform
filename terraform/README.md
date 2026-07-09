@@ -52,17 +52,55 @@ required — see `docs/16-deployment.md` "HTTPS, certificates and DNS"). Left em
 
 ### 1. Bootstrap remote state (once per AWS account)
 
+Create the S3 bucket that stores Terraform state. State locking uses S3 native
+locking (`use_lockfile`), so no DynamoDB table is needed.
+
 ```bash
-cd terraform/backend
-terraform init
-terraform apply        # creates the S3 state bucket (state locking uses S3 use_lockfile)
+# From the repository root:
+scripts/terraform/bootstrap-remote-state.sh
 ```
 
-### 2. Enable the S3 backend
+The script runs `terraform init` + `apply` in `terraform/backend/` and then prints
+the exact backend block + migrate command for the next step. (Equivalent manual
+run: `terraform -chdir=terraform/backend init && terraform -chdir=terraform/backend
+apply`.)
 
-Uncomment the `backend "s3"` block in `environments/<env>/main.tf` (it is left
-commented so the configuration can be validated locally before the state bucket
-exists).
+Notes:
+
+* `terraform/backend/` uses **local state** — it cannot store its own state in the
+  bucket it is creating (chicken-and-egg). This is expected; the bucket changes
+  rarely. Keep the local `terraform/backend/terraform.tfstate` (it is gitignored,
+  never committed).
+* Creating the bucket is **idempotent** — re-running the script is safe.
+* The bucket has `prevent_destroy` set, so Terraform will refuse to delete it (it
+  holds every environment's state). See "Recovery / teardown" below.
+
+### 2. Enable the S3 backend and migrate state (once per environment)
+
+For each environment (`dev`, then `prod`):
+
+1. In `environments/<env>/main.tf`, uncomment the `backend "s3"` block (left
+   commented so the config validates locally before the bucket exists). It must
+   read exactly (only the `key` differs per environment):
+
+   ```hcl
+   backend "s3" {
+     bucket       = "hosting-platform-tfstate"   # the bucket_name from step 1
+     key          = "<env>/terraform.tfstate"
+     region       = "eu-central-1"
+     use_lockfile = true
+     encrypt      = true
+   }
+   ```
+
+2. Migrate the environment's local state into the bucket:
+
+   ```bash
+   terraform -chdir=terraform/environments/<env> init -migrate-state
+   # answer "yes" to copy existing state to the S3 backend
+   ```
+
+If you changed `bucket_name`/`aws_region` in step 1, use those values in the block.
 
 ### 3. Apply an environment
 
@@ -72,6 +110,25 @@ terraform init
 terraform plan
 terraform apply
 ```
+
+### Recovery / teardown
+
+* **Bucket name already taken** (S3 names are global): set a unique `bucket_name`
+  (`TF_VAR_bucket_name` or edit `terraform/backend/variables.tf`) and re-run, then
+  use that name in every `backend "s3"` block.
+* **`bootstrap-remote-state.sh` interrupted:** just re-run it — bucket creation is
+  idempotent and any missing sub-resources (versioning/encryption/public-access
+  block) are reconciled.
+* **Lost local `terraform/backend/terraform.tfstate` but the bucket exists:** don't
+  re-apply blindly (Terraform would try to recreate an existing bucket and fail).
+  Re-import it: `terraform -chdir=terraform/backend import
+  aws_s3_bucket.tfstate hosting-platform-tfstate`, then `apply` to reconcile.
+* **Corrupted/rolled-back environment state:** the bucket has versioning enabled —
+  restore a previous version of `<env>/terraform.tfstate` from S3.
+* **Intentional teardown of the state bucket:** remove the `prevent_destroy` block
+  in `terraform/backend/main.tf` first (it is deliberately guarded), then
+  `terraform -chdir=terraform/backend destroy`. Do this only after every
+  environment has been destroyed.
 
 ## Validate
 

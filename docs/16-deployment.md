@@ -90,10 +90,11 @@ automated image publishing pipeline yet).
    `example.com`) in the environment `terraform.tfvars`. This is a prerequisite of
    the ACM certificate created in step 2; the domain/zone stay manual on purpose
    (see "HTTPS, certificates and DNS").
-1. **Terraform remote state** — apply `terraform/backend/` with local state to
-   create the state bucket, then uncomment the `backend "s3"` block in the
-   environment and `terraform init -migrate-state` (see `06-terraform.md`
-   "Enablement Sequence"). Remote state must be active before any real
+1. **Terraform remote state** — run `scripts/terraform/bootstrap-remote-state.sh`
+   to create the state bucket (idempotent), then uncomment the `backend "s3"` block
+   in each environment and `terraform init -migrate-state` (see `06-terraform.md`
+   "Enablement Sequence" and `terraform/README.md` "Remote state bootstrap" for the
+   full runbook + recovery). Remote state must be active before any real
    `terraform apply`.
 2. **Provision infrastructure** — `terraform apply` the environment
    (`terraform/environments/<env>`), providing `TF_VAR_db_password`. This also

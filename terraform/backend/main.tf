@@ -21,6 +21,15 @@ provider "aws" {
 resource "aws_s3_bucket" "tfstate" {
   bucket = var.bucket_name
 
+  # This bucket holds ALL Terraform state (every environment). Guard it against
+  # accidental deletion — a stray `terraform destroy` here would orphan every
+  # environment's state. Intentionally tearing it down requires removing this block
+  # first (see terraform/README.md "Remote state bootstrap" -> recovery/teardown).
+  # Versioning (below) additionally allows recovering a previous state object.
+  lifecycle {
+    prevent_destroy = true
+  }
+
   tags = {
     Name        = var.bucket_name
     Project     = "hosting-platform"
