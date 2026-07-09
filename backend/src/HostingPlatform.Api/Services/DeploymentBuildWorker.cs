@@ -34,7 +34,24 @@ public class DeploymentBuildWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await RecoverInterruptedDeploymentsAsync(stoppingToken);
+        // An exception escaping ExecuteAsync stops the entire host (.NET default
+        // BackgroundServiceExceptionBehavior.StopHost), so a transient database
+        // failure here must never propagate. Recovery is best-effort: deployments
+        // it could not fail remain non-terminal and are picked up by the next
+        // restart's recovery pass.
+        try
+        {
+            await RecoverInterruptedDeploymentsAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Startup recovery of interrupted deployments failed; continuing without it");
+        }
 
         await foreach (var deploymentId in _queue.DequeueAllAsync(stoppingToken))
         {
@@ -94,19 +111,21 @@ public class DeploymentBuildWorker : BackgroundService
         var jobs = provider.GetRequiredService<IKubernetesJobService>();
         var cloudFront = provider.GetRequiredService<ICloudFrontService>();
 
-        var deployment = await db.Deployments
-            .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == deploymentId, cancellationToken);
-        if (deployment is null)
-        {
-            _logger.LogWarning("Build worker skipped unknown deployment {DeploymentId}", deploymentId);
-            return;
-        }
-
-        var project = deployment.Project;
-
         try
         {
+            // Inside the try so a transient database failure is handled below and
+            // cannot escape ExecuteAsync (which would stop the host).
+            var deployment = await db.Deployments
+                .Include(d => d.Project)
+                .FirstOrDefaultAsync(d => d.Id == deploymentId, cancellationToken);
+            if (deployment is null)
+            {
+                _logger.LogWarning("Build worker skipped unknown deployment {DeploymentId}", deploymentId);
+                return;
+            }
+
+            var project = deployment.Project;
+
             await deployments.UpdateStatusAsync(deploymentId, DeploymentStatus.Building);
 
             await jobs.CreateBuildJobAsync(
