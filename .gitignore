@@ -6,3 +6,11 @@ PROJECT_HANDOFF_2026-06-29.md
 PROJECT_HANDOFF_2026-06-30.md
  PROJECT_HANDOFF_2026-07-01.md
  PROJECT_HANDOFF_2026-07-02.md
+
+# Real (filled-in) Kubernetes config/secret manifests must never be committed.
+# Use the bootstrap script (scripts/deployment/bootstrap-config.sh) or, if copying
+# a template, keep only the *.example.yaml files in Git. See docs/16-deployment.md
+# "Configuration and secrets bootstrap".
+k8s/secrets/*.yaml
+!k8s/secrets/*.example.yaml
+k8s/base/configmap.yaml

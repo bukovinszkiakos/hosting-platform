@@ -247,23 +247,29 @@ ConfigMaps store non-sensitive configuration values.
 
 Examples:
 
-* API URL
-* Environment Configuration
-* CloudFront URL
+* Environment configuration (`ASPNETCORE_ENVIRONMENT`, `NODE_ENV`)
+* AWS region / bucket / CloudFront distribution + domain
+* Cookie settings
+
+`backend-config` and `frontend-config` are created during bootstrap, before the
+first deploy, from the Terraform outputs — see `16-deployment.md` "Configuration
+and secrets bootstrap". `deploy.yml` verifies they exist and never creates them.
 
 ---
 
 # Secrets
 
-Kubernetes Secrets store sensitive data.
+Kubernetes Secrets store sensitive data. The only Secret today is
+`backend-secrets`, holding the database connection string.
 
-Examples:
+It is created during bootstrap by `scripts/deployment/bootstrap-config.sh`, which
+builds the connection string from the Terraform outputs plus the `DB_PASSWORD`
+supplied out-of-band; the password is never written to disk or committed to Git
+(see `16-deployment.md` "Configuration and secrets bootstrap" and `.gitignore`).
 
-* Database Connection String
-* Session Secret
-* AWS Access Configuration
-
-Future versions may migrate to AWS Secrets Manager.
+Future versions may move secrets to **AWS Secrets Manager** with the **External
+Secrets Operator** syncing them into the cluster, removing manual handling of the
+password.
 
 ---
 

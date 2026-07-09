@@ -275,6 +275,7 @@ Utility scripts.
 scripts/
 ├── local-dev/
 ├── deployment/
+│   └── bootstrap-config.sh   # create backend/frontend ConfigMaps + backend Secret from Terraform outputs
 └── terraform/
 ```
 

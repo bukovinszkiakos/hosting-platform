@@ -104,10 +104,11 @@ This cannot be exercised locally. To show a real build publishing a live site:
    DNS").
 2. **Build & push images** for the backend and frontend to ECR; set the image URIs
    in the Kubernetes Deployments.
-3. **Create the ConfigMap + Secret** (from Terraform outputs — see
-   `k8s/base/configmap.example.yaml`, `k8s/secrets/secret.example.yaml`). The rest
-   of the manifests (namespace, ServiceAccount, Deployments, Services, Ingress,
-   HPAs) are applied by `deploy.yml`.
+3. **Create the ConfigMap + Secret** by running
+   `DB_PASSWORD=... scripts/deployment/bootstrap-config.sh <env>` (fills values from
+   the Terraform outputs; see `16-deployment.md` "Configuration and secrets
+   bootstrap"). The rest of the manifests (namespace, ServiceAccount, Deployments,
+   Services, Ingress, HPAs) are applied by `deploy.yml`.
 4. **Run the deploy workflow** (`deploy.yml`), which applies the base resources,
    runs the database migration Job (backend image + `migrate`) to create/upgrade
    the schema on RDS before rollout — there is no auto-migrate on startup — then

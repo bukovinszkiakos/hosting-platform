@@ -120,14 +120,96 @@ automated image publishing pipeline yet).
    tagging and pushing the images is still manual — no automated image build/push
    pipeline exists yet (a future enhancement).
 6. **ConfigMap + Secret** — create `backend-config` / `frontend-config` and
-   `backend-secrets` in the `hosting-platform` namespace from the Terraform
-   outputs and the DB connection string, using
-   `k8s/base/configmap.example.yaml` and `k8s/secrets/secret.example.yaml` as
-   templates. `deploy.yml` verifies these exist and fails early if not.
+   `backend-secrets` in the `hosting-platform` namespace by running
+   `scripts/deployment/bootstrap-config.sh <env>` with `DB_PASSWORD` set. It fills
+   the non-secret values from the Terraform outputs and the connection string from
+   `DB_PASSWORD`, and applies all three objects idempotently. `deploy.yml` verifies
+   they exist and fails early if not. See "Configuration and secrets bootstrap".
 > **Database schema** — no longer a manual bootstrap step. Migrations are applied
 > in-cluster by the migration Job that `deploy.yml` runs before every rollout (see
 > "Database migrations" below). The bootstrap only has to ensure the ConfigMap and
 > Secret (step 6) exist, since the Job reads the connection string from them.
+
+---
+
+# Configuration and secrets bootstrap
+
+The application reads all runtime configuration from three Kubernetes objects in
+the `hosting-platform` namespace. They must exist **before** the first deploy —
+`deploy.yml` verifies them and fails early if any is missing (it never creates
+them, so it holds no secret values and stays idempotent).
+
+| Object | Kind | Holds |
+| --- | --- | --- |
+| `backend-config` | ConfigMap | Non-secret backend config (env, AWS region/bucket/CloudFront, cookie settings) |
+| `frontend-config` | ConfigMap | Non-secret frontend config (`NODE_ENV`) |
+| `backend-secrets` | Secret | The database connection string (sensitive) |
+
+These map to the backend's configuration via the ASP.NET Core `__` convention
+(e.g. `AWS__BucketName` → `AWS:BucketName`); the Deployments consume them with
+`envFrom` (see `k8s/backend/deployment.yaml`).
+
+## Bootstrap strategy — the script
+
+Run the idempotent helper once per environment:
+
+```bash
+export DB_PASSWORD='<rds-master-password>'   # same value as TF_VAR_db_password
+scripts/deployment/bootstrap-config.sh dev   # or prod
+```
+
+It reads the non-secret values straight from `terraform output` for that
+environment, builds the connection string, points kubectl at the environment's EKS
+cluster, applies `k8s/base/namespace.yaml`, and applies all three objects with
+`kubectl create ... --dry-run=client -o yaml | kubectl apply -f -`. Re-running it
+updates the values in place. The `k8s/base/configmap.example.yaml` and
+`k8s/secrets/secret.example.yaml` files remain as the reference/fallback templates.
+
+## Which values come from Terraform outputs
+
+`backend-config` is populated entirely from `terraform output` (of
+`terraform/environments/<env>`):
+
+| Config key | Terraform output |
+| --- | --- |
+| `AWS__Region` | `aws_region` |
+| `AWS__BucketName` | `s3_bucket_name` |
+| `AWS__CloudFrontDistributionId` | `cloudfront_distribution_id` |
+| `AWS__CloudFrontDomain` | `cloudfront_domain_name` |
+| `ASPNETCORE_ENVIRONMENT`, `Authentication__*` | fixed literals (app defaults) |
+
+`backend-secrets` is built from Terraform outputs **plus** the password:
+`rds_database_endpoint` (split into host/port), `rds_database_name`,
+`rds_database_username`, and `DB_PASSWORD`.
+
+## Which values must be supplied manually (and why)
+
+Only the **database password** (`DB_PASSWORD`). It is deliberately **not** a
+Terraform output: exposing it via `terraform output` would print it in plaintext
+and make it trivial to capture in logs/CI. It is supplied out-of-band (the same
+value as `TF_VAR_db_password`) and only ever lands in the Kubernetes Secret — never
+on disk, never in Git. `.gitignore` also blocks committing real
+`k8s/secrets/*.yaml` / `k8s/base/configmap.yaml` files as defense-in-depth.
+
+## Operational procedure
+
+* **Rotate the DB password:** change it in RDS, re-run the script with the new
+  `DB_PASSWORD`, then restart the backend (`kubectl -n hosting-platform rollout
+  restart deployment/backend`) so it picks up the new Secret.
+* **Change an AWS value** (e.g. a new bucket/CloudFront after a Terraform change):
+  re-run the script; it re-reads the outputs and updates `backend-config`.
+
+## Future production improvements
+
+* **AWS Secrets Manager + External Secrets Operator (ESO).** Store the connection
+  string (or discrete credentials) in Secrets Manager and have ESO sync it into a
+  Kubernetes Secret, so no human handles the password and rotation is automatic.
+  Deferred for the MVP: it adds a controller, IAM, and Secrets Manager resources.
+* **Terraform-managed Secret/ConfigMap** via the Kubernetes provider. Natural since
+  the DB password is already in Terraform state, but it couples app config to the
+  infra apply and adds provider/namespace-ordering wiring — heavier than the MVP
+  needs. The script keeps config bootstrap in the deploy lane, matching the
+  documented "Kubernetes objects are applied outside Terraform" separation.
 
 ---
 

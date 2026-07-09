@@ -38,6 +38,11 @@ output "rds_database_name" {
   value       = module.rds.database_name
 }
 
+output "rds_database_username" {
+  description = "Master username of the RDS PostgreSQL database (used to build the backend connection string during bootstrap)"
+  value       = module.rds.database_username
+}
+
 output "s3_bucket_name" {
   description = "Name of the S3 hosting bucket"
   value       = module.s3.bucket_name
@@ -76,4 +81,9 @@ output "ecr_frontend_repository_url" {
 output "acm_certificate_arn" {
   description = "ARN of the validated ACM certificate for the ALB HTTPS listener (null until a domain is configured); set as the ACM_CERTIFICATE_ARN GitHub secret."
   value       = module.acm.certificate_arn
+}
+
+output "aws_region" {
+  description = "AWS region of this environment (used by the config/secret bootstrap script)"
+  value       = var.aws_region
 }

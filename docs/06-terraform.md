@@ -228,6 +228,13 @@ cap). Dev leaves these at their cheaper defaults.
 
 * database_endpoint
 * database_name
+* database_username (non-secret; used to build the backend connection string during
+  the config/secret bootstrap — see `16-deployment.md`)
+
+Each environment additionally exposes an `aws_region` output; together with the
+RDS/S3/CloudFront outputs it lets `scripts/deployment/bootstrap-config.sh` fill the
+ConfigMaps/Secret without hand-copying. The database **password** is deliberately
+not an output (it would be printed in plaintext); it is supplied out-of-band.
 
 ---
 
