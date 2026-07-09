@@ -385,8 +385,11 @@ see `16-deployment.md`).
 * AWS Load Balancer Controller IAM Role + Pod Identity association (bound to the
   `aws-load-balancer-controller` service account in `kube-system`), so the
   controller can provision the ALB for the Ingress. Its policy is the official
-  controller policy (`alb-controller-iam-policy.json`, pinned to controller
-  v3.4.0) and must be kept in sync with the installed controller version.
+  controller policy (`alb-controller-iam-policy.json`, corresponding to controller
+  `v2.11.x`) and must be kept in sync with the installed controller version. The
+  controller itself is installed out-of-band via Helm
+  (`scripts/deployment/install-alb-controller.sh`), not by Terraform — see
+  `16-deployment.md` "AWS Load Balancer Controller".
 
 (The EKS cluster and node-group IAM roles are created in the EKS module, since
 a cluster cannot be created without them.)

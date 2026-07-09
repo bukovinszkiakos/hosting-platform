@@ -319,7 +319,9 @@ carries no S3 or CloudFront permissions.
 The **AWS Load Balancer Controller** role is granted the same way: a Pod Identity
 association with the `aws-load-balancer-controller` service account (in
 `kube-system`) gives the controller the permissions it needs to provision the
-ALB for the Ingress. The controller itself is installed at deploy time (Helm).
+ALB for the Ingress. The controller itself is installed once via its Helm chart
+(`scripts/deployment/install-alb-controller.sh`), reusing this role through Pod
+Identity — see `16-deployment.md` "AWS Load Balancer Controller".
 
 ---
 

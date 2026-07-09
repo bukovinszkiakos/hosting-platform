@@ -27,9 +27,9 @@ Bootstrap (manual, one-time / infrequent)
   1. Terraform remote state           (terraform/backend/, then enable the S3 backend)
   2. terraform apply <environment>    (VPC, EKS, RDS, S3, CloudFront, ECR, ACM cert, IAM + Pod Identity)
   3. Set ACM_CERTIFICATE_ARN secret   (from the acm_certificate_arn Terraform output)
-  4. AWS Load Balancer Controller     (Helm install; uses the Terraform-provisioned role)
+  4. AWS Load Balancer Controller     (scripts/deployment/install-alb-controller.sh; Helm chart, reuses the Terraform role + Pod Identity)
   5. Build & push images to ECR       (repositories created by Terraform in step 2; build/tag/push backend + frontend)
-  6. Create ConfigMap + Secret        (from Terraform outputs; see the *.example.yaml)
+  6. Create ConfigMap + Secret        (scripts/deployment/bootstrap-config.sh; from Terraform outputs)
 
 Repeatable (automated — deploy.yml, workflow_dispatch)
   7. Apply namespace / service account / RBAC
@@ -108,9 +108,11 @@ automated image publishing pipeline yet).
    `ACM_CERTIFICATE_ARN` GitHub secret; `deploy.yml` injects it into the ALB Ingress
    (the ALB terminates HTTPS; Secure cookies require it). See "HTTPS, certificates
    and DNS".
-4. **AWS Load Balancer Controller** — install via Helm into `kube-system`; it uses
-   the IAM role Terraform created (Pod Identity). Without it the Ingress cannot
-   create an ALB (see `07-kubernetes.md` "Ingress").
+4. **AWS Load Balancer Controller** — run
+   `scripts/deployment/install-alb-controller.sh <env>`. It installs the controller
+   via its Helm chart into `kube-system`, reusing the IAM role + Pod Identity
+   association Terraform already created. Without it the Ingress cannot create an
+   ALB (see `07-kubernetes.md` "Ingress" and "AWS Load Balancer Controller" below).
 5. **Container images** — the backend and frontend are containerized in-repo via
    `backend/Dockerfile` and `frontend/Dockerfile` (see "Container images" below).
    The ECR repositories are created by Terraform in step 2 (see `06-terraform.md`
@@ -129,6 +131,89 @@ automated image publishing pipeline yet).
 > in-cluster by the migration Job that `deploy.yml` runs before every rollout (see
 > "Database migrations" below). The bootstrap only has to ensure the ConfigMap and
 > Secret (step 6) exist, since the Job reads the connection string from them.
+
+---
+
+# AWS Load Balancer Controller
+
+The ALB Ingress (`k8s/ingress/alb-ingress.yaml`) only provisions an Application
+Load Balancer if the **AWS Load Balancer Controller** is running in the cluster.
+Installing it is a one-time cluster bootstrap step.
+
+## Installation method
+
+The controller is installed via its **official Helm chart** (`eks/aws-load-balancer-controller`),
+wrapped in `scripts/deployment/install-alb-controller.sh` for repeatability. Helm
+is AWS's recommended install path: the chart bundles the controller's CRDs
+(`TargetGroupBinding`, `IngressClassParams`) and generates the admission webhook's
+self-signed certificate, so no cert-manager or hand-maintained manifests are
+needed.
+
+It is deliberately **not** installed through Terraform. Doing so would pull the
+`helm`/`kubernetes` providers into the infrastructure apply and make their provider
+configuration depend on the EKS cluster created in the same apply — a fragile
+pattern (init/plan ordering, destroy edge cases) that the project intentionally
+avoids (the IAM module already notes "no extra Terraform provider required"). Keeping
+the install as an idempotent script preserves that simplicity while still being
+repeatable.
+
+## Prerequisites
+
+* `helm`, `aws`, and `kubectl` on PATH, with AWS credentials for the account.
+* The environment already `terraform apply`-ed — the script reads `eks_cluster_name`,
+  `aws_region` and `vpc_id` from `terraform output`, and the **IAM role + Pod
+  Identity association** for `kube-system/aws-load-balancer-controller` are created
+  by the Terraform IAM module.
+* The **EKS Pod Identity Agent** addon (enabled in the Terraform EKS module) must be
+  active — it is what injects the role's credentials into the controller pods.
+
+## Installation procedure
+
+```bash
+scripts/deployment/install-alb-controller.sh dev   # or prod
+```
+
+The script points kubectl at the cluster, adds/updates the `eks` Helm repo, and runs
+`helm upgrade --install` with `clusterName`, `region` and `vpcId` set explicitly
+(so the controller does not rely on IMDS auto-discovery) and `--wait`.
+
+## Pod Identity integration
+
+The Terraform IAM module creates the controller's IAM role and an
+`aws_eks_pod_identity_association` binding it to the `kube-system/aws-load-balancer-controller`
+service account. The Helm chart therefore just **creates that service account by
+name** (`serviceAccount.create=true`, `serviceAccount.name=aws-load-balancer-controller`)
+and it must **not** carry an IRSA `eks.amazonaws.com/role-arn` annotation — the Pod
+Identity Agent supplies the credentials. The script sets no such annotation.
+
+## Upgrade considerations
+
+* The chart version is pinned in the script (`CHART_VERSION`, currently `1.11.0` /
+  controller `v2.11.x`) and **must stay in sync with the IAM policy** in
+  `terraform/modules/iam/alb-controller-iam-policy.json`. When bumping the
+  controller, update that policy file from the matching upstream `iam_policy.json`
+  **and** the script's `CHART_VERSION` together, then `terraform apply` (policy) and
+  re-run the script (controller).
+* Helm does **not** upgrade CRDs automatically on `helm upgrade`. If a new version
+  changes the CRDs, apply the chart's updated CRDs manually first (see the upstream
+  release notes).
+
+## Operational procedure
+
+* **Re-run / repair:** `install-alb-controller.sh` is idempotent (`upgrade
+  --install`); re-run it to converge the release.
+* **Verify:** `kubectl -n kube-system get deployment aws-load-balancer-controller`
+  and `kubectl -n kube-system logs deploy/aws-load-balancer-controller`.
+* **Uninstall:** `helm -n kube-system uninstall aws-load-balancer-controller`
+  (leaves the Terraform-managed IAM role/association intact).
+
+## Future improvements
+
+* If/when the controller is offered as a first-party **EKS managed add-on**
+  (`aws_eks_addon`), it could replace the Helm step and move fully into Terraform
+  without extra providers.
+* A GitOps installer (Argo CD/Flux) could manage the controller declaratively
+  alongside other cluster add-ons.
 
 ---
 

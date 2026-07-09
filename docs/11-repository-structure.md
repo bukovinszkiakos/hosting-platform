@@ -275,7 +275,8 @@ Utility scripts.
 scripts/
 ├── local-dev/
 ├── deployment/
-│   └── bootstrap-config.sh   # create backend/frontend ConfigMaps + backend Secret from Terraform outputs
+│   ├── install-alb-controller.sh   # one-time: install the AWS Load Balancer Controller (Helm) reusing the Terraform IAM role
+│   └── bootstrap-config.sh         # create backend/frontend ConfigMaps + backend Secret from Terraform outputs
 └── terraform/
 ```
 
