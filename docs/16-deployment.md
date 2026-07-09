@@ -24,10 +24,10 @@ it stays a deliberate manual operation run by an operator who controls the state
 ```text
 Bootstrap (manual, one-time / infrequent)
   1. Terraform remote state           (terraform/backend/, then enable the S3 backend)
-  2. terraform apply <environment>    (VPC, EKS, RDS, S3, CloudFront, IAM + Pod Identity)
+  2. terraform apply <environment>    (VPC, EKS, RDS, S3, CloudFront, ECR, IAM + Pod Identity)
   3. AWS Load Balancer Controller     (Helm install; uses the Terraform-provisioned role)
   4. ACM certificate                  (for ALB HTTPS; requires a domain)
-  5. Build & push images to ECR       (backend + frontend)
+  5. Build & push images to ECR       (repositories created by Terraform in step 2; build/tag/push backend + frontend)
   6. Create ConfigMap + Secret        (from Terraform outputs; see the *.example.yaml)
   7. Apply the database schema         (dotnet ef / one-off migration Job)
 
@@ -83,9 +83,11 @@ automated image publishing pipeline yet).
    "Enablement Sequence"). Remote state must be active before any real
    `terraform apply`.
 2. **Provision infrastructure** — `terraform apply` the environment
-   (`terraform/environments/<env>`), providing `TF_VAR_db_password`. Record the
-   outputs (`terraform output`): `eks_cluster_name`, `s3_bucket_name`,
-   `cloudfront_distribution_id`, `cloudfront_domain_name`, `rds_database_endpoint`.
+   (`terraform/environments/<env>`), providing `TF_VAR_db_password`. This also
+   creates the ECR repositories (step 5). Record the outputs (`terraform output`):
+   `eks_cluster_name`, `s3_bucket_name`, `cloudfront_distribution_id`,
+   `cloudfront_domain_name`, `rds_database_endpoint`,
+   `ecr_backend_repository_url`, `ecr_frontend_repository_url`.
 3. **AWS Load Balancer Controller** — install via Helm into `kube-system`; it uses
    the IAM role Terraform created (Pod Identity). Without it the Ingress cannot
    create an ALB (see `07-kubernetes.md` "Ingress").
@@ -94,10 +96,12 @@ automated image publishing pipeline yet).
    Secure cookies require it).
 5. **Container images** — the backend and frontend are containerized in-repo via
    `backend/Dockerfile` and `frontend/Dockerfile` (see "Container images" below).
-   Build both images, push them to a registry (ECR intended), then pass the image
-   URIs as `deploy.yml` inputs. Creating the ECR repositories and pushing the
-   images are still manual: no ECR resource is defined in Terraform and no
-   automated image build/push pipeline exists yet (both are future enhancements).
+   The ECR repositories are created by Terraform in step 2 (see `06-terraform.md`
+   "ECR Module"); take their URIs from the `ecr_backend_repository_url` /
+   `ecr_frontend_repository_url` outputs. Build both images, tag them for those
+   repositories, push, then pass the image URIs as `deploy.yml` inputs. Building,
+   tagging and pushing the images is still manual — no automated image build/push
+   pipeline exists yet (a future enhancement).
 6. **ConfigMap + Secret** — create `backend-config` / `frontend-config` and
    `backend-secrets` in the `hosting-platform` namespace from the Terraform
    outputs and the DB connection string, using
@@ -170,9 +174,11 @@ docker run --rm -p 8080:8080 \
 
 The images take **no build-time configuration**: all runtime config comes from the
 environment (the backend reads `ASPNETCORE_ENVIRONMENT`, the connection string and
-`AWS__*` from the ConfigMap/Secret; the frontend uses same-origin `/api`). To tag
-for ECR, retag the built image with the ECR URI and push (repo creation + push are
-manual — see bootstrap step 5).
+`AWS__*` from the ConfigMap/Secret; the frontend uses same-origin `/api`). The ECR
+repositories are created by Terraform (see `06-terraform.md` "ECR Module"); retag
+the built image with the repository URI (from the `ecr_*_repository_url` outputs)
+and push. Repositories use immutable tags, so push each build under a unique tag
+(e.g. the Git commit SHA). Tagging and pushing are manual — see bootstrap step 5.
 
 ## Assumptions and limitations
 
@@ -194,7 +200,7 @@ manual — see bootstrap step 5).
 Actions → **Deploy (manual)** → *Run workflow*, then provide:
 
 * **environment** — `dev` or `prod`
-* **backend_image** — full image URI (e.g. `…dkr.ecr.<region>.amazonaws.com/hosting-platform-backend:<tag>`)
+* **backend_image** — full image URI (e.g. `…dkr.ecr.<region>.amazonaws.com/hosting-platform-<env>-backend:<tag>`)
 * **frontend_image** — full image URI
 
 The workflow configures kubectl for `hosting-platform-<env>-eks`, applies the

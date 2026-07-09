@@ -62,3 +62,13 @@ output "backend_role_arn" {
   description = "ARN of the backend service IAM role"
   value       = module.iam.backend_role_arn
 }
+
+output "ecr_backend_repository_url" {
+  description = "URI of the backend ECR repository (tag/push images here; pass as deploy.yml backend_image)"
+  value       = module.ecr.repository_urls["backend"]
+}
+
+output "ecr_frontend_repository_url" {
+  description = "URI of the frontend ECR repository (tag/push images here; pass as deploy.yml frontend_image)"
+  value       = module.ecr.repository_urls["frontend"]
+}

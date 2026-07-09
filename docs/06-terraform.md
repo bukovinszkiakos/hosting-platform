@@ -50,6 +50,7 @@ terraform/
 │ ├── rds
 │ ├── s3
 │ ├── cloudfront
+│ ├── ecr
 │ └── iam
 │
 └── backend
@@ -69,6 +70,7 @@ module "eks"
 module "rds"
 module "s3"
 module "cloudfront"
+module "ecr"
 module "iam"
 ```
 
@@ -260,6 +262,57 @@ cap). Dev leaves these at their cheaper defaults.
 
 * cloudfront_domain_name
 * cloudfront_distribution_id
+
+---
+
+# ECR Module
+
+## Responsibilities
+
+* Create one private ECR repository per application (backend + frontend), named
+  `{name_prefix}-backend` and `{name_prefix}-frontend`
+* Enable image vulnerability scanning on push
+* Enforce a lifecycle policy that bounds storage growth
+
+## Inputs
+
+* name_prefix
+
+Behaviour is tunable through variables with production-safe defaults:
+`scan_on_push` (default `true`), `image_tag_mutability` (default `IMMUTABLE`),
+`max_image_count` (default `10`), `untagged_image_expiry_days` (default `1`), and
+`force_delete` (default `false`; the dev environment sets it `true` so
+`terraform destroy` can remove repositories that still hold images).
+
+## Outputs
+
+* repository_urls (map: `backend` / `frontend` -> repository URI)
+* repository_arns
+* repository_names
+
+## Design notes
+
+* **Per-environment repositories.** Each environment owns its own repositories
+  (`hosting-platform-dev-*`, `hosting-platform-prod-*`), so a fresh AWS account
+  can stand up either environment independently. This matches the naming
+  convention used by every other resource.
+* **Immutable tags.** A deployed tag always maps to exactly one image, which
+  makes rollbacks and audits unambiguous. Push each build under a unique tag
+  (e.g. the Git commit SHA) rather than reusing a moving tag.
+* **Scan on push.** ECR basic scanning runs automatically on every push, so known
+  CVEs surface without a separate pipeline step.
+* **Lifecycle policy.** Two rules keep storage bounded:
+  1. expire **untagged** images after `untagged_image_expiry_days` (default 1);
+  2. keep only the `max_image_count` most recent images (default 10).
+  Ten images gives comfortable rollback headroom for a small project while
+  preventing unbounded growth. ECR requires the `tagStatus = "any"` rule to have
+  the highest priority (evaluated last), so untagged cleanup runs first.
+* **Pulls.** The EKS node role already has `AmazonEC2ContainerRegistryReadOnly`
+  (EKS module), so no additional IAM is required for the cluster to pull images.
+
+The GitHub Actions deploy workflow assumes these repositories already exist and
+only builds/tags/pushes images to them (image build/push is not yet automated —
+see `16-deployment.md`).
 
 ---
 

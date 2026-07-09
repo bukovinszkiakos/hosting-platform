@@ -18,11 +18,11 @@ on:
         options: [dev, prod]
         default: dev
       backend_image:
-        description: "Backend image URI (e.g. <acct>.dkr.ecr.<region>.amazonaws.com/hosting-platform-backend:<tag>)"
+        description: "Backend image URI (e.g. <acct>.dkr.ecr.<region>.amazonaws.com/hosting-platform-<env>-backend:<tag>)"
         type: string
         required: true
       frontend_image:
-        description: "Frontend image URI"
+        description: "Frontend image URI (e.g. <acct>.dkr.ecr.<region>.amazonaws.com/hosting-platform-<env>-frontend:<tag>)"
         type: string
         required: true
 

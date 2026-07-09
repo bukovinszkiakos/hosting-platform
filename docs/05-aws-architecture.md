@@ -34,6 +34,8 @@ AWS
 │
 ├── CloudFront
 │
+├── ECR
+│
 ├── IAM
 │
 └── Terraform State Bucket
@@ -201,6 +203,34 @@ root), a CloudFront Function rewrites directory requests to the site's
 /{userId}/{projectId}      -> /{userId}/{projectId}/index.html
 /{userId}/{projectId}/     -> /{userId}/{projectId}/index.html
 ```
+
+---
+
+# ECR
+
+## Technology
+
+* Amazon Elastic Container Registry (ECR)
+
+## Purpose
+
+Private container registries for the platform's own application images (the
+backend API and the frontend). Images are built and pushed during bootstrap and
+pulled by the backend and frontend Kubernetes Deployments.
+
+One repository per application, per environment
+(`hosting-platform-{environment}-backend` and
+`hosting-platform-{environment}-frontend`), so each environment is independently
+reproducible. Repositories are created by Terraform (see `06-terraform.md` "ECR
+Module"). Image scanning runs on push, and a lifecycle policy bounds storage by
+retaining only recent images.
+
+The EKS node group role carries `AmazonEC2ContainerRegistryReadOnly`, so nodes
+pull these images directly; pulls to nodes in the private subnets egress through
+the NAT Gateway.
+
+> These registries hold the *platform's* images. Generated user websites are not
+> containers — they are static files stored in S3 and served through CloudFront.
 
 ---
 

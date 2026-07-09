@@ -103,3 +103,12 @@ module "iam" {
   cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
   eks_cluster_name           = module.eks.cluster_name
 }
+
+module "ecr" {
+  source = "../../modules/ecr"
+
+  name_prefix = local.name_prefix
+
+  # Production keeps the safe defaults: immutable tags, scan on push, and
+  # force_delete off so repositories are never destroyed while holding images.
+}

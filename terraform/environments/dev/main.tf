@@ -84,3 +84,13 @@ module "iam" {
   cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
   eks_cluster_name           = module.eks.cluster_name
 }
+
+module "ecr" {
+  source = "../../modules/ecr"
+
+  name_prefix = local.name_prefix
+
+  # Dev is ephemeral: allow 'terraform destroy' to remove repositories that still
+  # hold images (mirrors the RDS skip_final_snapshot posture).
+  force_delete = true
+}
