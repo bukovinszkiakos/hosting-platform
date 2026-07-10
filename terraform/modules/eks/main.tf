@@ -130,3 +130,25 @@ resource "aws_eks_addon" "pod_identity_agent" {
     Name = "${var.name_prefix}-pod-identity-agent"
   }
 }
+
+# ---------------------------------------------------------------------------
+# Metrics Server
+# ---------------------------------------------------------------------------
+# Community EKS add-on providing the resource-metrics API (metrics.k8s.io) that
+# the frontend HPA (k8s/hpa/frontend-hpa.yaml) reads pod CPU utilization from.
+# Without it the HPA reports <unknown> and never scales. It runs as a small
+# deployment on the existing worker nodes — the add-on itself is free, so there
+# is no additional AWS cost. See docs/07-kubernetes.md "Horizontal Pod
+# Autoscaler".
+
+resource "aws_eks_addon" "metrics_server" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "metrics-server"
+
+  # Runs as pods on the worker nodes, so the node group must exist.
+  depends_on = [aws_eks_node_group.this]
+
+  tags = {
+    Name = "${var.name_prefix}-metrics-server"
+  }
+}

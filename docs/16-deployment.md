@@ -344,10 +344,11 @@ on disk, never in Git. `.gitignore` also blocks committing real
 `k8s/secrets/*.yaml` / `k8s/base/configmap.yaml` files as defense-in-depth.
 
 **Password characters:** use letters, digits and the symbols
-`! # $ % ^ & * ( ) _ + = . , : ? ~ -` only. RDS forbids `/`, `@`, `"` and
-spaces, and `;` or `'` would silently corrupt the Npgsql connection string the
-script builds. Both the Terraform `db_password` variable and
-`bootstrap-config.sh` validate this and fail fast on a disallowed character.
+`! # $ % ^ & * ( ) _ + . , : ? ~ -` only. RDS forbids `/`, `@`, `"` and
+spaces, and `;`, `'` or `=` would silently corrupt the Npgsql connection string
+the script builds (a literal `=` mis-parses as a key/value separator). Both the
+Terraform `db_password` variable and `bootstrap-config.sh` validate this and
+fail fast on a disallowed character.
 
 **Master user (accepted MVP limitation):** the connection string uses the RDS
 **master** username — the application and the migration Job run with full

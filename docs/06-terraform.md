@@ -198,6 +198,10 @@ including recovery and intentional teardown.
 * Create Managed Node Group
 * Create Cluster IAM Roles
 * Enable the EKS Pod Identity Agent addon
+* Enable the Metrics Server addon (community add-on; supplies the
+  `metrics.k8s.io` API the frontend HPA scales on — see `07-kubernetes.md`
+  "Horizontal Pod Autoscaler"; runs on the existing nodes, no additional AWS
+  cost)
 
 The API endpoint has both private and public access enabled. `kubernetes_version`
 defaults to an EKS standard-support release (currently `1.34`) to avoid

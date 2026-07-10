@@ -422,6 +422,16 @@ Only the **frontend** uses an HPA. The frontend is stateless and scales freely.
 * Automatic scaling based on workload
 * Efficient resource utilization
 
+## Metrics source
+
+The HPA scales on CPU utilization, which requires the `metrics.k8s.io` resource
+metrics API — **not** installed on EKS by default. It is provided by the
+**Metrics Server** community EKS add-on, enabled in the Terraform EKS module
+alongside the Pod Identity Agent (see `06-terraform.md` "EKS Module"). Without
+it the HPA would apply cleanly but report `<unknown>` targets and never scale.
+Verify after deploy with `kubectl -n hosting-platform get hpa` (the CPU column
+must show a percentage, not `<unknown>`).
+
 ---
 
 # Frontend HPA

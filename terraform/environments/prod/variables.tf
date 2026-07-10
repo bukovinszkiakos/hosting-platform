@@ -41,7 +41,7 @@ variable "az_count" {
 
 variable "db_password" {
   type        = string
-  description = "Master password for the RDS PostgreSQL database. Provide via TF_VAR_db_password; never commit it. Letters, digits and !#$%^&*()_+=.,:?~- only (RDS forbids / @ \" and spaces; ; and ' would corrupt the Npgsql connection string built by bootstrap-config.sh)."
+  description = "Master password for the RDS PostgreSQL database. Provide via TF_VAR_db_password; never commit it. Letters, digits and !#$%^&*()_+.,:?~- only (RDS forbids / @ \" and spaces; ;, ' and = would corrupt the Npgsql connection string built by bootstrap-config.sh)."
   sensitive   = true
 
   validation {
@@ -50,8 +50,8 @@ variable "db_password" {
   }
 
   validation {
-    condition     = can(regex("^[A-Za-z0-9!#$%^&*()_+=.,:?~-]+$", var.db_password))
-    error_message = "db_password may contain only letters, digits and !#$%^&*()_+=.,:?~- (RDS forbids / @ \" and spaces; ; and ' break the generated connection string)."
+    condition     = can(regex("^[A-Za-z0-9!#$%^&*()_+.,:?~-]+$", var.db_password))
+    error_message = "db_password may contain only letters, digits and !#$%^&*()_+.,:?~- (RDS forbids / @ \" and spaces; ;, ' and = break the generated connection string)."
   }
 }
 

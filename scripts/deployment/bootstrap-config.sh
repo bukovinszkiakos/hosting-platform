@@ -42,12 +42,13 @@ fi
 : "${DB_PASSWORD:?Set DB_PASSWORD (the RDS master password) in the environment}"
 
 # Fail fast on characters that RDS forbids (/ @ " space) or that would silently
-# corrupt the Npgsql connection string built below (; '). Mirrors the Terraform
-# db_password validation — see docs/16-deployment.md "Which values must be
-# supplied manually".
-if printf '%s' "$DB_PASSWORD" | grep -q "[;'\"@/ ]"; then
-  echo "error: DB_PASSWORD contains a disallowed character (; ' \" @ / or space)." >&2
-  echo "       Use letters, digits and: ! # \$ % ^ & * ( ) _ + = . , : ? ~ -" >&2
+# corrupt the Npgsql connection string built below (; ' =). A literal '=' inside
+# an ADO.NET-style value mis-parses as a key/value separator. Mirrors the
+# Terraform db_password validation — see docs/16-deployment.md "Which values
+# must be supplied manually".
+if printf '%s' "$DB_PASSWORD" | grep -q "[;'\"@/= ]"; then
+  echo "error: DB_PASSWORD contains a disallowed character (; ' \" @ / = or space)." >&2
+  echo "       Use letters, digits and: ! # \$ % ^ & * ( ) _ + . , : ? ~ -" >&2
   exit 1
 fi
 

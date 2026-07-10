@@ -47,8 +47,8 @@ The database password is **never committed**. Provide it out-of-band:
 export TF_VAR_db_password="<strong-password>"
 ```
 
-Use letters, digits and `!#$%^&*()_+=.,:?~-` only — RDS forbids `/ @ "` and
-spaces, and `; '` would corrupt the connection string that
+Use letters, digits and `!#$%^&*()_+.,:?~-` only — RDS forbids `/ @ "` and
+spaces, and `; ' =` would corrupt the connection string that
 `scripts/deployment/bootstrap-config.sh` builds. Both the variable validation and
 the script enforce this.
 

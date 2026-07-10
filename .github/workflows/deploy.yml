@@ -132,6 +132,10 @@ jobs:
           # missing/stale schema. Migrations are idempotent, so this is safe on every
           # deploy. Jobs are immutable, so any previous run is deleted before re-applying.
           kubectl -n "$NAMESPACE" delete job db-migrate --ignore-not-found
+          # Fail fast if the placeholder line drifted — otherwise sed exits 0 without
+          # substituting and the Job ships image: "PLACEHOLDER" (opaque pull failure).
+          grep -q 'image: "PLACEHOLDER"' k8s/jobs/migrate-job.yaml || {
+            echo '::error::image placeholder not found in k8s/jobs/migrate-job.yaml — cannot inject the backend image.'; exit 1; }
           sed "s#image: \"PLACEHOLDER\".*#image: \"${BACKEND_IMAGE}\"#" k8s/jobs/migrate-job.yaml | kubectl apply -f -
           # Poll the Job's conditions so a failure ends the deploy promptly (respecting
           # backoffLimit) instead of waiting out the whole timeout.
@@ -164,7 +168,12 @@ jobs:
           # The Deployment manifests carry image: "PLACEHOLDER" (images are built
           # and pushed manually — see docs/16-deployment.md). Substitute the URIs
           # supplied as workflow inputs. '#' is the sed delimiter since image URIs
-          # contain '/' and ':'.
+          # contain '/' and ':'. Fail fast if a placeholder line drifted — otherwise
+          # sed exits 0 without substituting and the manifest ships image: "PLACEHOLDER".
+          for f in k8s/backend/deployment.yaml k8s/frontend/deployment.yaml; do
+            grep -q 'image: "PLACEHOLDER"' "$f" || {
+              echo "::error::image placeholder not found in $f — cannot inject the image."; exit 1; }
+          done
           sed "s#image: \"PLACEHOLDER\".*#image: \"${BACKEND_IMAGE}\"#" k8s/backend/deployment.yaml | kubectl apply -f -
           sed "s#image: \"PLACEHOLDER\".*#image: \"${FRONTEND_IMAGE}\"#" k8s/frontend/deployment.yaml | kubectl apply -f -
           kubectl apply -f k8s/hpa/frontend-hpa.yaml
