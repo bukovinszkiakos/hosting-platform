@@ -118,12 +118,17 @@ module "ecr" {
   # force_delete off so repositories are never destroyed while holding images.
 }
 
-module "acm" {
-  source = "../../modules/acm"
+# The platform is served over HTTPS on this distribution's default
+# *.cloudfront.net domain — no custom domain or ACM certificate required.
+# Disabled until the ALB exists (set alb_dns_name in terraform.tfvars after the
+# first deploy, then re-apply); see docs/16-deployment.md "HTTPS via the
+# CloudFront default domain". The dormant modules/acm module remains available
+# if custom-domain support is ever reintroduced. Price class stays at the
+# default PriceClass_100: with caching disabled this distribution is a TLS
+# terminator in front of the ALB, so wider edge coverage buys little.
+module "cloudfront_platform" {
+  source = "../../modules/cloudfront-platform"
 
-  # DNS-validated ACM certificate for the ALB's HTTPS listener. Disabled until a
-  # domain is supplied (domain_name/hosted_zone_name in terraform.tfvars); see
-  # docs/16-deployment.md "HTTPS, certificates and DNS".
-  domain_name      = var.domain_name
-  hosted_zone_name = var.hosted_zone_name
+  name_prefix  = local.name_prefix
+  alb_dns_name = var.alb_dns_name
 }

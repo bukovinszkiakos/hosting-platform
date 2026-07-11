@@ -11,3 +11,10 @@ hosting_bucket_name = "hosting-platform-prod-sites"
 # committed with a real value — set it here or via
 # TF_VAR_cluster_endpoint_public_access_cidrs.
 # cluster_endpoint_public_access_cidrs = ["203.0.113.10/32"]
+
+# Set after the first deploy, once the Ingress has created the ALB
+# (kubectl -n hosting-platform get ingress hosting-platform), then re-apply to
+# create the platform CloudFront distribution — its *.cloudfront.net domain is
+# the platform's public HTTPS URL. See docs/16-deployment.md "HTTPS via the
+# CloudFront default domain".
+# alb_dns_name = "k8s-<...>.elb.amazonaws.com"

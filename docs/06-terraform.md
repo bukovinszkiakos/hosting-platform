@@ -50,8 +50,9 @@ terraform/
 │ ├── rds
 │ ├── s3
 │ ├── cloudfront
+│ ├── cloudfront-platform
 │ ├── ecr
-│ ├── acm
+│ ├── acm          (dormant — kept for future custom-domain support)
 │ └── iam
 │
 └── backend
@@ -71,8 +72,8 @@ module "eks"
 module "rds"
 module "s3"
 module "cloudfront"
+module "cloudfront_platform"
 module "ecr"
-module "acm"
 module "iam"
 ```
 
@@ -343,53 +344,69 @@ see `16-deployment.md`).
 
 ---
 
-# ACM Module
+# CloudFront Platform Module
+
+The HTTPS entry point for the **platform itself** — a second CloudFront
+distribution whose default `*.cloudfront.net` domain is the platform's public
+URL, with the ALB as its HTTP origin. This is what lets the platform run
+without a custom domain or certificate (see `05-aws-architecture.md` "HTTPS
+Without a Custom Domain" and `16-deployment.md` "HTTPS via the CloudFront
+default domain").
 
 ## Responsibilities
 
-* Create a **DNS-validated ACM certificate** for the platform's public HTTPS
-  endpoint (the ALB Ingress), in the ALB's region
-* Create the Route53 validation records in an existing hosted zone
-* Wait (`aws_acm_certificate_validation`) until the certificate is issued
+* Create the platform CloudFront distribution (default CloudFront certificate,
+  `redirect-to-https`)
+* Pass all traffic through uncached (managed `CachingDisabled` cache policy +
+  `AllViewer` origin request policy, all HTTP methods) to the ALB origin over
+  HTTP
 
 ## Inputs
 
-* domain_name (empty disables the module — no certificate is created)
-* hosted_zone_name (the existing public Route53 zone authoritative for the domain;
-  required when `domain_name` is set)
-* subject_alternative_names (optional)
+* name_prefix
+* alb_dns_name (empty — the default — disables the module; validated to end in
+  `.elb.amazonaws.com` when set)
+* price_class (default `PriceClass_100`)
 
 ## Outputs
 
-* certificate_arn (null when disabled) — set as the `ACM_CERTIFICATE_ARN` GitHub
-  secret; the deploy workflow injects it into the ALB Ingress
-* domain_name
-* hosted_zone_id
+* domain_name (null when disabled) — the platform's public HTTPS URL
+* distribution_id (null when disabled)
 
 ## Design notes
 
-* **Gated on `domain_name`.** With no domain (the default in both environments),
-  the module creates nothing and the environment still applies cleanly. Set
-  `domain_name` + `hosted_zone_name` in `terraform.tfvars` to enable HTTPS.
-* **DNS validation, so it auto-renews.** As long as the Route53 validation records
-  remain, ACM renews the certificate automatically — no operator action and no
-  expiry outage (see `16-deployment.md` "Renewal").
-* **Regional certificate.** It lives in the ALB's region (unlike the CloudFront
-  distribution for user sites, which uses its own default certificate), so no
-  `us-east-1` provider alias is needed.
+* **Gated on `alb_dns_name` (two-phase apply).** The ALB is created by the AWS
+  Load Balancer Controller when the Ingress is first applied, so its DNS name is
+  unknown on the initial `terraform apply`. Apply once with the default, run the
+  first deploy, then set `alb_dns_name` in `terraform.tfvars` and apply again.
+  A teardown/re-bootstrap produces a new ALB hostname, so this step repeats per
+  environment lifetime.
+* **Separate from the user-sites distribution.** User sites occupy the path root
+  of theirs (`/{userId}/{projectId}`), which would collide with the platform
+  frontend at `/`; a distribution has no fixed cost, so separation is free.
+* **`PriceClass_100` even in prod.** With caching disabled the distribution is a
+  TLS terminator, not a CDN — wider edge coverage buys little.
 
-## Scope boundary — what is intentionally NOT in Terraform
+---
 
-* **Domain registration** — an external purchase, not IaC.
-* **The Route53 hosted zone + registrar NS delegation** — a one-time manual
-  prerequisite. The module consumes the existing zone via a data source so a single
-  `terraform apply` can both create and validate the certificate (creating the zone
-  in the same apply would force a two-phase apply: create zone → delegate at the
-  registrar → then validation can pass).
-* **The ALB alias record** — the ALB is created by the AWS Load Balancer Controller
-  after the app deploys, so its hostname is unknown at infra-apply time; the record
-  is added once, post-deploy (`external-dns` is the future automation). See
-  `16-deployment.md` "HTTPS, certificates and DNS".
+# ACM Module (dormant)
+
+**Not wired into any environment.** The platform serves HTTPS on the CloudFront
+default domain instead (CloudFront Platform Module above), so no custom domain
+or certificate is required. The module is kept in the repository because it
+costs nothing and preserves the re-enable path for custom-domain support.
+
+When dormant it documents (and on re-enable would provide): a DNS-validated ACM
+certificate created through an existing Route53 hosted zone, gated on
+`domain_name` (empty creates nothing). To reintroduce a custom domain: re-add
+the module call plus `domain_name`/`hosted_zone_name` variables in the
+environment, attach the certificate to the platform CloudFront distribution as
+an alias (CloudFront certificates are issued in `us-east-1`) or to an ALB HTTPS
+listener (regional), and point a Route53 alias record at the chosen entry
+point — see `16-deployment.md` "Reintroducing a custom domain".
+
+Domain registration and the Route53 hosted zone + registrar NS delegation were
+always intentionally outside Terraform and would remain manual steps.
 
 ---
 
@@ -452,10 +469,11 @@ Production environment.
 
 Future versions may include:
 
-* Terraform-managed Route53 hosted zone (today the zone + registrar NS delegation
-  are a manual prerequisite; ACM certificate issuance/validation is already managed
-  by the ACM module)
-* `external-dns` to manage the ALB Route53 alias record automatically
+* Custom domain support: re-enable the dormant ACM module, add a Route53 hosted
+  zone and an alias on the platform CloudFront distribution (see "ACM Module
+  (dormant)")
+* Restricting the ALB origin to CloudFront via the
+  `com.amazonaws.global.cloudfront.origin-facing` managed prefix list
 * AWS Secrets Manager
 * CloudWatch
 * Advanced Auto Scaling

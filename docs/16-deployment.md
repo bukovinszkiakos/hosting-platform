@@ -23,34 +23,102 @@ it stays a deliberate manual operation run by an operator who controls the state
 
 ```text
 Bootstrap (manual, one-time / infrequent)
-  0. Domain + Route53 hosted zone     (register a domain; create a public hosted zone; delegate registrar NS -> Route53)
   1. Terraform remote state           (terraform/backend/, then enable the S3 backend)
-  2. terraform apply <environment>    (VPC, EKS, RDS, S3, CloudFront, ECR, ACM cert, IAM + Pod Identity)
-  3. Set ACM_CERTIFICATE_ARN secret   (from the acm_certificate_arn Terraform output)
-  4. AWS Load Balancer Controller     (scripts/deployment/install-alb-controller.sh; Helm chart, reuses the Terraform role + Pod Identity)
-  5. Build & push images to ECR       (repositories created by Terraform in step 2; build/tag/push backend + frontend)
-  6. Create ConfigMap + Secret        (scripts/deployment/bootstrap-config.sh; from Terraform outputs)
-  7. CI deploy principal              (IAM user + EKS access entry + GitHub secrets — see "CI deploy principal" below)
+  2. terraform apply <environment>    (VPC, EKS, RDS, S3, CloudFront, ECR, IAM + Pod Identity)
+  3. AWS Load Balancer Controller     (scripts/deployment/install-alb-controller.sh; Helm chart, reuses the Terraform role + Pod Identity)
+  4. Build & push images to ECR       (repositories created by Terraform in step 2; build/tag/push backend + frontend)
+  5. Create ConfigMap + Secret        (scripts/deployment/bootstrap-config.sh; from Terraform outputs)
+  6. CI deploy principal              (IAM user + EKS access entry + GitHub secrets — see "CI deploy principal" below)
 
 Repeatable (automated — deploy.yml, workflow_dispatch)
-  8. Apply namespace / service account / RBAC
-  9. Run the database migration Job   (backend image + `migrate`; applied and awaited before rollout)
- 10. Apply Services + Deployments (with the supplied image URIs) + frontend HPA
- 11. Wait for the rollout
- 12. Apply the Ingress (ACM cert injected from the secret)
- 13. Print a deployment summary
+  7. Apply namespace / service account / RBAC
+  8. Run the database migration Job   (backend image + `migrate`; applied and awaited before rollout)
+  9. Apply Services + Deployments (with the supplied image URIs) + frontend HPA
+ 10. Wait for the rollout
+ 11. Apply the Ingress (HTTP-only listener; the ALB is created on the first apply)
+ 12. Print a deployment summary
 
-After the first deploy (one-time): point a Route53 alias record for the domain at
-the provisioned ALB (see "HTTPS, certificates and DNS").
+After the first deploy (one-time per environment lifetime): set alb_dns_name in
+terraform.tfvars to the new ALB's hostname and `terraform apply` again — this
+creates the platform CloudFront distribution, whose default *.cloudfront.net
+domain is the platform's public HTTPS URL (see "HTTPS via the CloudFront
+default domain").
 ```
 
-The application deploy (steps 8–13) is what `deploy.yml` automates — including the
-database migration (step 9), which runs as an idempotent one-off Job before the
-rollout (see "Database migrations" below). Steps 0–7 are the manual bootstrap
-described below; step 0 (domain + hosted zone) is a prerequisite of step 2 so the
-ACM certificate can be DNS-validated, and step 7 (CI deploy principal) is a
-prerequisite of the first `deploy.yml` run — without the access entry every
-`kubectl` call in the workflow fails with an authorization error.
+The application deploy (steps 7–12) is what `deploy.yml` automates — including the
+database migration (step 8), which runs as an idempotent one-off Job before the
+rollout (see "Database migrations" below). Steps 1–6 are the manual bootstrap
+described below; step 6 (CI deploy principal) is a prerequisite of the first
+`deploy.yml` run — without the access entry every `kubectl` call in the workflow
+fails with an authorization error. The post-first-deploy CloudFront apply exists
+because the ALB is created by the AWS Load Balancer Controller when the Ingress
+is first applied, so its DNS name cannot be known during the initial
+`terraform apply` (see "HTTPS via the CloudFront default domain").
+
+---
+
+# Flow diagrams
+
+## End-to-end bootstrap + first deployment
+
+```text
+Developer
+    ↓
+Remote state bootstrap                    (step 1 — scripts/terraform/bootstrap-remote-state.sh)
+    ↓
+terraform apply                           (step 2 — alb_dns_name still unset)
+    ↓
+AWS infrastructure                        (VPC, EKS, RDS, S3, CloudFront for user sites, ECR, IAM)
+    ↓
+Install ALB Controller                    (step 3 — scripts/deployment/install-alb-controller.sh)
+    ↓
+Build & push images                       (step 4 — docker build/tag/push to ECR)
+    ↓
+bootstrap-config.sh                       (step 5 — ConfigMaps + Secret)
+    ↓
+Configure GitHub secrets                  (step 6 — CI deploy principal + 3 secrets)
+    ↓
+Run deploy.yml                            (steps 7–12 — migrations, rollout, Ingress)
+    ↓
+ALB created                               (hostname printed in the deploy summary)
+    ↓
+Copy ALB hostname into alb_dns_name       (terraform.tfvars)
+    ↓
+terraform apply                           (second apply — ~5 min CloudFront rollout)
+    ↓
+Platform CloudFront created
+    ↓
+Platform available at https://<cloudfront-domain>
+```
+
+## Runtime request flow (the platform)
+
+```text
+User
+    ↓ HTTPS   (default *.cloudfront.net certificate)
+Platform CloudFront
+    ↓ HTTP    (caching disabled — pass-through origin)
+Application Load Balancer
+    ↓
+Kubernetes Ingress
+   ↙        ↘
+Frontend    Backend
+(/)         (/api)
+```
+
+## Publishing flow (hosted user websites)
+
+```text
+GitHub Repository
+    ↓  (clone + build)
+Build Job                                 (Kubernetes Job in the cluster)
+    ↓  (aws s3 sync + invalidation)
+S3
+    ↓
+User Website CloudFront
+    ↓ HTTPS
+Visitor                                   (https://<cloudfront-domain>/{userId}/{projectId})
+```
 
 ---
 
@@ -67,11 +135,10 @@ only picked up when the names match the workflow's input values:
 | `AWS_ACCESS_KEY_ID` | IAM credentials the workflow deploys with |
 | `AWS_SECRET_ACCESS_KEY` | " |
 | `AWS_REGION` | AWS region of the cluster (e.g. `eu-central-1`) |
-| `ACM_CERTIFICATE_ARN` | ACM certificate ARN injected into the ALB Ingress for HTTPS — take it from the `acm_certificate_arn` Terraform output (see "HTTPS, certificates and DNS") |
 
-The workflow validates all four are present before doing anything and fails early
+The workflow validates all three are present before doing anything and fails early
 with a clear message if any is missing. The IAM principal these keys belong to
-must be created and granted cluster access first — bootstrap step 7, "CI deploy
+must be created and granted cluster access first — bootstrap step 6, "CI deploy
 principal" below. Without it, the workflow authenticates to AWS but every
 `kubectl` command fails with an authorization error.
 
@@ -91,20 +158,6 @@ run. They are intentionally **not** automated (state safety, external
 dependencies, and image build/publish being a deliberate operator step — no
 automated image publishing pipeline yet).
 
-0. **Domain + Route53 hosted zone** — register a domain, create a **public Route53
-   hosted zone** for it, and delegate the registrar's nameservers to that zone.
-   Set `domain_name` (e.g. `app.example.com`) and `hosted_zone_name` (e.g.
-   `example.com`) in the environment `terraform.tfvars`. This is a prerequisite of
-   the ACM certificate created in step 2; the domain/zone stay manual on purpose
-   (see "HTTPS, certificates and DNS").
-
-   > **Wait for NS delegation to propagate before step 2.** ACM validates the
-   > certificate through the hosted zone, and `terraform apply` blocks on that
-   > validation — if the registrar's nameserver delegation has not propagated
-   > yet, the apply just hangs at `aws_acm_certificate_validation` (up to its
-   > ~75-minute timeout) with no useful error. Check with
-   > `dig NS <hosted_zone_name>` that the Route53 nameservers are returned
-   > before applying.
 1. **Terraform remote state** — run `scripts/terraform/bootstrap-remote-state.sh`
    to create the state bucket (idempotent), then uncomment the `backend "s3"` block
    in each environment and `terraform init -migrate-state` (see `06-terraform.md`
@@ -113,12 +166,14 @@ automated image publishing pipeline yet).
    `terraform apply`.
 2. **Provision infrastructure** — `terraform apply` the environment
    (`terraform/environments/<env>`), providing `TF_VAR_db_password`. This also
-   creates the ECR repositories (step 5) and — when `domain_name` is set (step 0) —
-   the DNS-validated **ACM certificate** for the ALB. Record the outputs
+   creates the ECR repositories (step 4). Record the outputs
    (`terraform output`): `eks_cluster_name`, `s3_bucket_name`,
    `cloudfront_distribution_id`, `cloudfront_domain_name`, `rds_database_endpoint`,
-   `ecr_backend_repository_url`, `ecr_frontend_repository_url`,
-   `acm_certificate_arn`.
+   `ecr_backend_repository_url`, `ecr_frontend_repository_url`. (The
+   `platform_cloudfront_domain_name` / `platform_cloudfront_distribution_id`
+   outputs are `null` on this first apply — they are populated by the
+   post-first-deploy apply that sets `alb_dns_name`; see "HTTPS via the
+   CloudFront default domain".)
 
    > **Billing starts here.** From the moment this apply finishes, the always-on
    > resources (EKS control plane, NAT Gateway, nodes, RDS, ALB after the first
@@ -126,17 +181,12 @@ automated image publishing pipeline yet).
    > Plan to complete the remaining bootstrap steps and the first deploy in one
    > sitting, and **tear the environment down after the demo** — see "Cost and
    > teardown" below. Idle time, not usage, is the dominant cost.
-3. **ACM certificate secret** — the certificate itself is created by Terraform in
-   step 2 (ACM module). Put the `acm_certificate_arn` output value in the
-   `ACM_CERTIFICATE_ARN` GitHub secret; `deploy.yml` injects it into the ALB Ingress
-   (the ALB terminates HTTPS; Secure cookies require it). See "HTTPS, certificates
-   and DNS".
-4. **AWS Load Balancer Controller** — run
+3. **AWS Load Balancer Controller** — run
    `scripts/deployment/install-alb-controller.sh <env>`. It installs the controller
    via its Helm chart into `kube-system`, reusing the IAM role + Pod Identity
    association Terraform already created. Without it the Ingress cannot create an
    ALB (see `07-kubernetes.md` "Ingress" and "AWS Load Balancer Controller" below).
-5. **Container images** — the backend and frontend are containerized in-repo via
+4. **Container images** — the backend and frontend are containerized in-repo via
    `backend/Dockerfile` and `frontend/Dockerfile` (see "Container images" below).
    The ECR repositories are created by Terraform in step 2 (see `06-terraform.md`
    "ECR Module"); take their URIs from the `ecr_backend_repository_url` /
@@ -150,13 +200,13 @@ automated image publishing pipeline yet).
    image URIs as `deploy.yml` inputs. Building, tagging and pushing the images
    is still manual — no automated image build/push pipeline exists yet (a future
    enhancement).
-6. **ConfigMap + Secret** — create `backend-config` / `frontend-config` and
+5. **ConfigMap + Secret** — create `backend-config` / `frontend-config` and
    `backend-secrets` in the `hosting-platform` namespace by running
    `scripts/deployment/bootstrap-config.sh <env>` with `DB_PASSWORD` set. It fills
    the non-secret values from the Terraform outputs and the connection string from
    `DB_PASSWORD`, and applies all three objects idempotently. `deploy.yml` verifies
    they exist and fails early if not. See "Configuration and secrets bootstrap".
-7. **CI deploy principal (IAM user + EKS access entry)** — `deploy.yml`
+6. **CI deploy principal (IAM user + EKS access entry)** — `deploy.yml`
    authenticates with IAM user credentials, but IAM authentication alone grants
    **no** Kubernetes permissions: the identity that ran `terraform apply` is
    cluster admin automatically (the cluster-creator access entry), while any
@@ -197,7 +247,7 @@ automated image publishing pipeline yet).
 > **Database schema** — no longer a manual bootstrap step. Migrations are applied
 > in-cluster by the migration Job that `deploy.yml` runs before every rollout (see
 > "Database migrations" below). The bootstrap only has to ensure the ConfigMap and
-> Secret (step 6) exist, since the Job reads the connection string from them.
+> Secret (step 5) exist, since the Job reads the connection string from them.
 
 ---
 
@@ -452,7 +502,7 @@ environment (the backend reads `ASPNETCORE_ENVIRONMENT`, the connection string a
 repositories are created by Terraform (see `06-terraform.md` "ECR Module"); retag
 the built image with the repository URI (from the `ecr_*_repository_url` outputs)
 and push. Repositories use immutable tags, so push each build under a unique tag
-(e.g. the Git commit SHA). Tagging and pushing are manual — see bootstrap step 5.
+(e.g. the Git commit SHA). Tagging and pushing are manual — see bootstrap step 4.
 
 ## Pushing to ECR
 
@@ -500,86 +550,98 @@ These full URIs (including the tag) are what `deploy.yml` takes as its
 
 ---
 
-# HTTPS, certificates and DNS
+# HTTPS via the CloudFront default domain
 
 ## Architecture
 
-The platform's own endpoint is served over **HTTPS terminated at the ALB**, with
-the HTTP listener redirecting to HTTPS (`k8s/ingress/alb-ingress.yaml`:
-`listen-ports`, `ssl-redirect`). HTTPS is **mandatory**: the backend issues
-`Secure` session cookies in Production, which browsers drop over plain HTTP, so
-without HTTPS authentication silently breaks. The ALB presents an **ACM
-certificate** supplied via the `alb.ingress.kubernetes.io/certificate-arn`
-annotation, which `deploy.yml` fills from the `ACM_CERTIFICATE_ARN` secret at
-apply time. (Published user sites are separate — CloudFront serves them over HTTPS
-with its own default certificate.)
+The platform runs entirely on **AWS-managed endpoints — no custom domain, no
+Route53 zone, no ACM certificate**. Its public entry point is a dedicated
+CloudFront distribution (`terraform/modules/cloudfront-platform`) that fronts
+the ALB and serves HTTPS on its default `*.cloudfront.net` domain:
 
-## ACM certificate process
+```text
+Browser ──HTTPS──> dxxxxxxxx.cloudfront.net ──HTTP──> ALB ──> Ingress
+                   (default CloudFront cert)                   ├─ /api → backend
+                                                               └─ /    → frontend
+```
 
-The certificate is **created and DNS-validated by Terraform** (ACM module, see
-`06-terraform.md`), not by hand in the console:
+HTTPS is still **mandatory** and still works: the backend issues `Secure`
+session cookies in Production, which browsers drop over plain HTTP — but the
+browser-facing connection is HTTPS (CloudFront), so cookies and login behave
+exactly as before. Only the CloudFront→ALB origin hop is plain HTTP (see
+"Limitations"). This is the AWS-native way to get valid, auto-renewed TLS with
+no domain purchase: ACM **cannot** issue a certificate for an AWS-owned
+`*.elb.amazonaws.com` name, so the ALB itself has an **HTTP-only listener**
+(`k8s/ingress/alb-ingress.yaml`) and no certificate annotation.
 
-* Set `domain_name` + `hosted_zone_name` in the environment `terraform.tfvars`.
-* `terraform apply` creates the certificate, writes the Route53 validation records
-  into the hosted zone, and waits until the certificate is **Issued**.
-* Read the ARN from the `acm_certificate_arn` output and store it in the
-  `ACM_CERTIFICATE_ARN` GitHub secret.
+Published user sites are unchanged and independent: they were already served
+from the *other* CloudFront distribution's default domain
+(`https://<cloudfront_domain_name>/{userId}/{projectId}`).
 
-The certificate is **regional** (issued in the ALB's region, e.g. `eu-central-1`) —
-not `us-east-1`, which is only for CloudFront.
+## The platform distribution
 
-## Domain requirements
+Created by the `cloudfront-platform` Terraform module, deliberately **separate**
+from the user-sites distribution (user sites occupy the path root of theirs,
+which would collide with the platform frontend at `/`; a distribution has no
+fixed cost, so the separation is free). Configuration highlights:
 
-A **custom domain is required** — ACM cannot issue a public certificate for an
-AWS-owned `*.elb.amazonaws.com` name. Registering the domain is an external
-purchase and is intentionally **not** managed by Terraform.
+* **Origin:** the ALB DNS name, `origin_protocol_policy = "http-only"`.
+* **No caching:** managed `CachingDisabled` cache policy + `AllViewer` origin
+  request policy — every request (headers, cookies, query strings) passes
+  through to the app; all HTTP methods allowed.
+* **`viewer_protocol_policy = "redirect-to-https"`** — plain-HTTP visits to the
+  CloudFront domain are redirected.
+* **Default CloudFront certificate** — valid TLS, renewed by AWS, zero config.
 
-## DNS configuration
+## Two-phase bootstrap (why `alb_dns_name` exists)
 
-* **Hosted zone (manual, one-time).** Create a **public Route53 hosted zone** for
-  the domain and delegate the registrar's nameservers to it. Terraform reads this
-  zone via a data source; keeping zone creation + registrar delegation manual lets
-  a single `terraform apply` both create and validate the certificate (a
-  Terraform-created zone would need a two-phase apply: create zone → delegate NS →
-  then validation can pass). This is a deliberate MVP boundary.
-* **Validation records (automatic).** Terraform manages the ACM `_acme`-style
-  CNAME validation records in the zone.
-* **ALB alias record (manual, one-time, post-deploy).** After the first deploy
-  creates the ALB, add a Route53 **A/AAAA alias** record for `domain_name`
-  pointing at the ALB (its hostname is in the deploy summary, or
-  `kubectl -n hosting-platform get ingress hosting-platform`). This is manual
-  because the ALB is created by the AWS Load Balancer Controller, not Terraform, so
-  its hostname is unknown at infra-apply time. The ALB hostname is stable across
-  redeploys (as long as the Ingress is not deleted), so this is a one-time step.
-  Automating it with **`external-dns`** is the documented future improvement.
+The ALB is created by the AWS Load Balancer Controller when the Ingress is
+first applied — its DNS name is unknown during the initial `terraform apply`.
+The module is therefore gated on the `alb_dns_name` variable (default `""` =
+not created), the same pattern the dormant ACM module used for `domain_name`:
 
-## ALB integration
+1. Initial `terraform apply` (with `alb_dns_name` unset) — everything except the
+   platform distribution is created.
+2. First `deploy.yml` run applies the Ingress; the controller provisions the ALB.
+3. Read the ALB hostname (deploy summary, or
+   `kubectl -n hosting-platform get ingress hosting-platform`), set
+   `alb_dns_name = "<that hostname>"` in the environment `terraform.tfvars`,
+   and `terraform apply` again (~5 min while CloudFront deploys globally).
+4. `terraform output -raw platform_cloudfront_domain_name` is now the platform's
+   public HTTPS URL: `https://dxxxxxxxx.cloudfront.net`.
 
-`deploy.yml` applies the Ingress last, substituting the real ARN:
-`sed "s#REPLACE_WITH_ACM_CERTIFICATE_ARN#${ACM_CERTIFICATE_ARN}#" ... | kubectl apply`.
-The Ingress carries no host rule, so it also answers on the raw ALB hostname during
-testing; the ACM certificate is presented on the HTTPS listener regardless.
+This replaces the old post-deploy step (the Route53 ALB alias record) — the
+manual-step count is unchanged. The ALB hostname is stable across redeploys as
+long as the Ingress is not deleted; a **teardown + re-bootstrap produces a new
+ALB hostname**, so step 3 is repeated each environment lifetime (see "Cost and
+teardown").
 
-## Bootstrap sequence (HTTPS-specific)
+## Direct ALB access (accepted limitation)
 
-1. Register the domain; create the public hosted zone; delegate registrar NS.
-2. Set `domain_name` + `hosted_zone_name`; `terraform apply`; the certificate is
-   issued.
-3. Put `acm_certificate_arn` into the `ACM_CERTIFICATE_ARN` secret.
-4. First `deploy.yml` run provisions the ALB and applies the Ingress with the cert.
-5. Add the Route53 alias record → ALB. HTTPS on the custom domain is now live.
+The ALB stays internet-facing, so its raw hostname also serves the app — over
+plain HTTP, bypassing CloudFront. This is an accepted MVP trade-off (documented
+in "Limitations" alongside no-WAF/no-rate-limiting) rather than a security
+hole:
 
-## Operational procedure and renewal
+* Session cookies are **host-only** to the CloudFront domain (no `Domain`
+  attribute) — a browser never sends them to the ALB hostname.
+* Cookies are `Secure`, so login simply does not work over the HTTP path; the
+  bypass exposes only what an unauthenticated visitor sees anyway.
 
-* **Renewal is automatic.** DNS-validated ACM certificates renew themselves as long
-  as the validation records (managed by Terraform) remain in the zone. There is no
-  expiry step to run and no cron.
-* **Changing the domain** — update `domain_name`/`hosted_zone_name`, `terraform
-  apply`, update the `ACM_CERTIFICATE_ARN` secret and the alias record, and
-  re-run `deploy.yml`.
-* **No manual AWS Console steps** are required for the certificate itself; the only
-  manual actions are the domain purchase, the hosted zone + registrar delegation,
-  and the one-time ALB alias record — all outside the certificate lifecycle.
+The production fix — a Terraform-managed security group admitting only the
+`com.amazonaws.global.cloudfront.origin-facing` managed prefix list, attached
+via the `alb.ingress.kubernetes.io/security-groups` annotation — is deliberately
+deferred to keep the networking simple.
+
+## Reintroducing a custom domain (future)
+
+The ACM module (`terraform/modules/acm`) is kept **dormant** in the repo. To
+offer a custom domain later: re-add the module call +
+`domain_name`/`hosted_zone_name` variables in the environment, attach the
+certificate as an alias on the platform CloudFront distribution (certificates
+for CloudFront are issued in `us-east-1`) or on an ALB HTTPS listener, and point
+a Route53 alias at the chosen entry point. Nothing in the application code
+assumes any hostname, so no app changes would be needed.
 
 ---
 
@@ -673,7 +735,9 @@ Actions → **Deploy (manual)** → *Run workflow*, then provide:
 The workflow configures kubectl for `hosting-platform-<env>-eks`, applies the base
 resources, runs the database migration Job to completion, applies the manifests,
 waits for the backend and frontend rollouts, applies the Ingress, and writes a
-summary (including the ALB hostname once provisioned).
+summary (including the ALB hostname once provisioned — that hostname is the
+CloudFront **origin**, not the public URL; the platform URL is the
+`platform_cloudfront_domain_name` Terraform output).
 
 ---
 
@@ -697,12 +761,16 @@ Run once after the first deployment (and after any node group / AMI change):
   # node group before allowing any untrusted build.
   ```
 
-* **App and ALB health**: `kubectl -n hosting-platform get pods`, then open the
-  frontend root (`https://<domain>/`) and an API route
-  (`https://<domain>/api/auth/me` → `401` when unauthenticated is the expected
-  healthy response). `/healthz` itself is not routed through the Ingress — only
-  the ALB target-group health checker and the Kubernetes probes call it on the
-  pods directly.
+* **App and ALB health**: `kubectl -n hosting-platform get pods`, then — after
+  the post-first-deploy apply that creates the platform distribution — open the
+  frontend root (`https://<platform-cloudfront-domain>/`) and an API route
+  (`https://<platform-cloudfront-domain>/api/auth/me` → `401` when
+  unauthenticated is the expected healthy response). Validate login **through
+  the CloudFront URL only** — against the raw ALB hostname the app loads over
+  plain HTTP but login silently fails (`Secure` cookies are dropped; see "HTTPS
+  via the CloudFront default domain"). `/healthz` itself is not routed through
+  the Ingress — only the ALB target-group health checker and the Kubernetes
+  probes call it on the pods directly.
 * **End-to-end build**: deploy a known-good public repository and confirm the
   published CloudFront URL serves it (see `15-demo.md` "Full AWS demo").
 
@@ -833,6 +901,14 @@ aws elbv2 describe-load-balancers --region "$AWS_REGION" \
 terraform -chdir=terraform/environments/dev destroy
 ```
 
+`terraform destroy` also removes the **platform CloudFront distribution**
+(expect the destroy to take ~5–15 minutes longer — CloudFront disables and then
+deletes it). Between deleting the Ingress and the destroy the distribution
+briefly points at a dead origin; that is harmless. After a re-bootstrap the new
+Ingress produces a **new ALB hostname**, so the post-first-deploy step (set
+`alb_dns_name` in `terraform.tfvars`, `terraform apply`) is repeated each
+environment lifetime — see "HTTPS via the CloudFront default domain".
+
 (If you also want to remove the AWS Load Balancer Controller and the remote-state
 bucket, see `07-kubernetes.md` / `06-terraform.md`; the state bucket has
 `prevent_destroy` and is meant to persist across teardowns.)
@@ -861,6 +937,18 @@ is still within standard support before each deploy and upgrade before it lapses
   images, install the load balancer controller, or create the ConfigMap/Secret —
   those are the manual bootstrap above. It *does* apply database migrations, via
   the pre-rollout migration Job (see "Database migrations").
+* **No custom domain.** The platform lives on an AWS-generated
+  `*.cloudfront.net` URL (and user sites on the other distribution's default
+  domain) — a deliberate cost decision; the dormant ACM module documents the
+  re-enable path (see "HTTPS via the CloudFront default domain").
+* **The ALB is directly reachable over plain HTTP**, bypassing CloudFront.
+  Accepted: session cookies are host-only to the CloudFront domain and `Secure`,
+  so the bypass exposes only unauthenticated content; the CloudFront
+  origin-facing prefix-list security group is the deferred production fix (see
+  "Direct ALB access").
+* **The CloudFront→ALB origin hop is unencrypted HTTP** (ACM cannot cover
+  `*.elb.amazonaws.com`, so the ALB has no HTTPS listener). Browser→CloudFront
+  is always HTTPS.
 * **Long-lived AWS keys** (OIDC recommended later — see the security note).
 * **The app connects as the RDS master user** — accepted MVP limitation; see
   "Configuration and secrets bootstrap".

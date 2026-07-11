@@ -78,9 +78,14 @@ output "ecr_frontend_repository_url" {
   value       = module.ecr.repository_urls["frontend"]
 }
 
-output "acm_certificate_arn" {
-  description = "ARN of the validated ACM certificate for the ALB HTTPS listener (null until a domain is configured); set as the ACM_CERTIFICATE_ARN GitHub secret."
-  value       = module.acm.certificate_arn
+output "platform_cloudfront_domain_name" {
+  description = "Default *.cloudfront.net domain of the platform distribution — the platform's public HTTPS URL (null until alb_dns_name is set post-first-deploy)"
+  value       = module.cloudfront_platform.domain_name
+}
+
+output "platform_cloudfront_distribution_id" {
+  description = "ID of the platform CloudFront distribution (null until alb_dns_name is set)"
+  value       = module.cloudfront_platform.distribution_id
 }
 
 output "aws_region" {

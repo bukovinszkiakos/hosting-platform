@@ -13,9 +13,10 @@ terraform/
 │   ├── eks/                 # EKS cluster, managed node group, cluster/node IAM roles, Pod Identity Agent addon
 │   ├── rds/                 # PostgreSQL, subnet group, security group
 │   ├── s3/                  # Static-site hosting bucket + public-read policy
-│   ├── cloudfront/          # CDN/HTTPS distribution + index.html rewrite function
+│   ├── cloudfront/          # CDN/HTTPS distribution for user sites + index.html rewrite function
+│   ├── cloudfront-platform/ # Platform HTTPS entry point: default *.cloudfront.net domain, ALB origin (gated on alb_dns_name)
 │   ├── ecr/                 # Backend + frontend container image repositories (scan on push, lifecycle policy)
-│   ├── acm/                 # DNS-validated ACM certificate for the ALB HTTPS listener (gated on domain_name)
+│   ├── acm/                 # DORMANT (unused): DNS-validated ACM certificate, kept for future custom-domain support
 │   └── iam/                 # Backend + ALB Controller IAM roles (least privilege) + Pod Identity associations
 └── environments/
     ├── dev/                 # Cost-minimized development environment
@@ -55,10 +56,13 @@ the script enforce this.
 `hosting_bucket_name` in `terraform.tfvars` must be globally unique across all of
 AWS S3 — adjust it if the default name is taken.
 
-To enable HTTPS on the platform's ALB endpoint, set `domain_name` and
-`hosted_zone_name` in `terraform.tfvars` (an existing public Route53 hosted zone is
-required — see `docs/16-deployment.md` "HTTPS, certificates and DNS"). Left empty
-(the default), the ACM module is a no-op and the environment still applies.
+The platform is served over HTTPS on the default `*.cloudfront.net` domain of
+the platform CloudFront distribution — no custom domain or certificate needed.
+The distribution is created by a **second apply after the first deploy**: set
+`alb_dns_name` in `terraform.tfvars` to the ALB hostname the deploy created,
+then re-apply (see `docs/16-deployment.md` "HTTPS via the CloudFront default
+domain"). Left empty (the default), the module is a no-op and the environment
+still applies.
 
 **Prod only:** `cluster_endpoint_public_access_cidrs` is a required variable with
 no default — a production apply must explicitly list the trusted administration

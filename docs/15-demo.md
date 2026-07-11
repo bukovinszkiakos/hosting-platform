@@ -103,9 +103,9 @@ This cannot be exercised locally. To show a real build publishing a live site:
 
 1. **Provision infrastructure** (see [`../terraform/README.md`](../terraform/README.md)):
    bootstrap remote state, then `terraform apply` an environment (creates VPC, EKS,
-   RDS, S3, CloudFront, ECR, IAM + Pod Identity, and — when a domain is configured —
-   the ACM certificate for HTTPS; see `16-deployment.md` "HTTPS, certificates and
-   DNS").
+   RDS, S3, CloudFront, ECR, IAM + Pod Identity). The platform CloudFront
+   distribution is added by a second apply after the first deploy (see
+   `16-deployment.md` "HTTPS via the CloudFront default domain").
 2. **Install the AWS Load Balancer Controller** with
    `scripts/deployment/install-alb-controller.sh <env>` (one-time, reuses the
    Terraform IAM role via Pod Identity; see `16-deployment.md` "AWS Load Balancer
@@ -121,11 +121,14 @@ This cannot be exercised locally. To show a real build publishing a live site:
    runs the database migration Job (backend image + `migrate`) to create/upgrade
    the schema on RDS before rollout — there is no auto-migrate on startup — then
    rolls out the app. See `16-deployment.md` "Database migrations".
-6. **Demo**: open the platform over HTTPS at the custom domain (or the raw ALB
-   hostname for a quick check), create a project with a
-   real public GitHub repo, click Deploy, and watch it reach **Online**; open the
-   generated CloudFront URL (`https://<domain>/<userId>/<projectId>`) to show the
-   live site.
+6. **Demo**: after the post-first-deploy apply (set `alb_dns_name`, re-apply),
+   open the platform over HTTPS at the CloudFront URL
+   (`terraform output -raw platform_cloudfront_domain_name`) — login only works
+   there, not on the raw ALB hostname (`Secure` cookies are dropped over HTTP) —
+   create a project with a real public GitHub repo, click Deploy, and watch it
+   reach **Online**; open the generated CloudFront URL
+   (`https://<cloudfront_domain_name>/<userId>/<projectId>`) to show the live
+   site.
 
 > Items requiring real AWS to verify: the build Job (clone → build → `aws s3 sync`
 > → CloudFront invalidation), EKS Pod Identity credential resolution, S3

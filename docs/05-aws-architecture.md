@@ -32,20 +32,21 @@ AWS
 │
 ├── S3
 │
-├── CloudFront
+├── CloudFront (user sites)
+│
+├── CloudFront (platform entry point, fronting the ALB)
 │
 ├── ECR
-│
-├── ACM (ALB certificate)
 │
 ├── IAM
 │
 └── Terraform State Bucket
 ```
 
-> **Route53** hosts the DNS zone for the platform's custom domain. It is an AWS
-> service but is **not** created by Terraform (see "HTTPS and Custom Domain" and
-> `06-terraform.md` "ACM Module" for the boundary), so it is not shown above.
+> **No Route53, no ACM, no custom domain.** The platform runs entirely on
+> AWS-managed endpoints: both CloudFront distributions serve HTTPS on their
+> default `*.cloudfront.net` domains (see "HTTPS Without a Custom Domain"). The
+> dormant ACM Terraform module is retained for future custom-domain support.
 
 ---
 
@@ -262,43 +263,48 @@ the NAT Gateway.
 
 ---
 
-# HTTPS and Custom Domain
+# HTTPS Without a Custom Domain
 
 The platform's own web endpoint (frontend + `/api`) is served over **HTTPS
-terminated at the Application Load Balancer**. HTTPS is mandatory, not optional:
-the backend issues `Secure` session cookies in Production, which browsers drop over
-plain HTTP, so serving the app over HTTP would silently break authentication. The
-ALB's HTTP listener redirects to HTTPS.
+terminated at a dedicated CloudFront distribution** on its default
+`*.cloudfront.net` domain, with the ALB as the distribution's HTTP origin
+(`terraform/modules/cloudfront-platform`). HTTPS is mandatory, not optional:
+the backend issues `Secure` session cookies in Production, which browsers drop
+over plain HTTP, so serving the app over HTTP would silently break
+authentication. The browser-facing hop is always HTTPS.
 
-## Certificate
+## Why CloudFront and not the ALB
 
-HTTPS at the ALB needs an **ACM certificate in the ALB's region** (not
-`us-east-1`, which is only for CloudFront). The certificate is **DNS-validated**
-and provisioned by Terraform (see `06-terraform.md` "ACM Module"): Terraform
-creates the certificate and the Route53 validation records and waits until the
-certificate is issued. DNS validation means the certificate **auto-renews** with no
-operator action as long as the validation records remain.
+An ACM public certificate **cannot** be issued for an AWS-owned
+`*.elb.amazonaws.com` name, so the raw ALB hostname can never serve valid
+HTTPS — and buying a domain is a cost this project deliberately avoids. The
+CloudFront default certificate provides valid, AWS-renewed TLS for free. The
+ALB therefore exposes an **HTTP-only listener** and is reached only by
+CloudFront (the direct-HTTP bypass is an accepted, documented limitation — see
+`16-deployment.md` "Direct ALB access").
 
-## Domain and DNS
+## Distribution shape
 
-A custom domain is required (an ACM public certificate cannot be issued for an
-AWS-owned `*.elb.amazonaws.com` name). The domain and its Route53 **public hosted
-zone** are an operator prerequisite:
+The platform distribution does **no caching** (managed `CachingDisabled` +
+`AllViewer` policies, all HTTP methods) — it is purely the TLS entry point in
+front of the ALB. Because the ALB only exists after the first deploy (the AWS
+Load Balancer Controller creates it), the distribution is created by a second
+`terraform apply` once `alb_dns_name` is known — see `16-deployment.md` "HTTPS
+via the CloudFront default domain".
 
-* **Domain registration** and **registrar → Route53 nameserver delegation** are
-  external, one-time, manual steps (a domain is a purchase; delegation is done at
-  the registrar). Terraform consumes the existing hosted zone via a data source.
-* After the first deployment creates the ALB, an **alias record** for the domain is
-  pointed at the ALB. The ALB is created by the AWS Load Balancer Controller (not
-  Terraform), so this record is added once, post-deploy (see
-  `16-deployment.md` "HTTPS, certificates and DNS"; `external-dns` is the future
-  automation).
+## Relationship to the user-sites CloudFront
 
-## Relationship to CloudFront
+Published user sites are served by the **other** CloudFront distribution, also
+on its default `*.cloudfront.net` certificate — that was already the case and is
+unchanged. The two distributions stay separate because user sites occupy the
+path root of theirs (`/{userId}/{projectId}`), which would collide with the
+platform frontend at `/`.
 
-This is separate from the **published user sites**, which are served by CloudFront
-over HTTPS using its default `*.cloudfront.net` certificate. Only the platform's own
-endpoint uses the ACM certificate + custom domain described here.
+## Custom domain (future)
+
+A custom domain (with the dormant ACM module, a Route53 zone, and an alias on
+the platform distribution) remains a documented future enhancement; nothing in
+the application code assumes any hostname.
 
 ---
 
@@ -380,10 +386,10 @@ The platform follows the following principles:
 Future versions may include:
 
 * AWS Secrets Manager
-* `external-dns` to manage the ALB Route53 alias record automatically (today it is
-  a one-time manual record — see "HTTPS and Custom Domain")
-* Terraform-managed Route53 hosted zone (today the zone + registrar delegation are
-  a manual prerequisite)
+* Custom domain support (re-enable the dormant ACM module; Route53 hosted zone +
+  alias on the platform CloudFront distribution — see "HTTPS Without a Custom
+  Domain")
+* Restricting the ALB to CloudFront via the origin-facing managed prefix list
 * CloudWatch Monitoring
 * Advanced Auto Scaling
 * Multiple Environments (Dev / Stage / Prod)

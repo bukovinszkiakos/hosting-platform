@@ -65,14 +65,8 @@ variable "hosting_bucket_name" {
   }
 }
 
-variable "domain_name" {
+variable "alb_dns_name" {
   type        = string
-  description = "Fully-qualified domain for the platform's public HTTPS endpoint (e.g. app.example.com). Empty (default) disables ACM/DNS so the environment applies before a domain is available."
-  default     = ""
-}
-
-variable "hosted_zone_name" {
-  type        = string
-  description = "Name of the existing public Route53 hosted zone authoritative for domain_name (e.g. example.com). Required when domain_name is set."
+  description = "DNS name of the platform ALB, known only after the first deploy creates it (kubectl -n hosting-platform get ingress). Empty (default) skips the platform CloudFront distribution so the environment applies before the ALB exists; set it and re-apply as the post-first-deploy step (docs/16-deployment.md)."
   default     = ""
 }

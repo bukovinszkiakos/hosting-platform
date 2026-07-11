@@ -121,8 +121,10 @@ Deploying to AWS is a manual (`workflow_dispatch`) workflow
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) that applies the
 Kubernetes manifests to an already-provisioned EKS cluster and waits for the
 rollout. Provisioning infrastructure (`terraform apply`), building/pushing images,
-installing the AWS Load Balancer Controller, the ACM certificate, the
-ConfigMap/Secret, and database migrations are one-time **manual bootstrap** steps.
+installing the AWS Load Balancer Controller, and the ConfigMap/Secret are
+one-time **manual bootstrap** steps; the platform is served over HTTPS on its
+CloudFront distribution's default `*.cloudfront.net` domain (no custom domain
+required).
 See [`docs/16-deployment.md`](docs/16-deployment.md) for the full process,
 required GitHub Secrets, deployment order, bootstrap requirements, rollback, and
 limitations.

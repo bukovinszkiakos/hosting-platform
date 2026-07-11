@@ -6,13 +6,14 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    # HTTPS termination at the ALB. The backend issues Secure session cookies in
-    # Production, which browsers drop over plain HTTP, so the app must be served
-    # over HTTPS. This requires an ACM certificate (and therefore a domain); see
-    # docs/07-kubernetes.md "Ingress". The HTTP listener redirects to HTTPS.
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/certificate-arn: "REPLACE_WITH_ACM_CERTIFICATE_ARN"
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # HTTP-only listener: TLS terminates at the platform CloudFront distribution
+    # (default *.cloudfront.net certificate), which fronts this ALB as its origin
+    # — ACM cannot issue certificates for *.elb.amazonaws.com, so the ALB itself
+    # has no HTTPS listener. Browsers must reach the platform through CloudFront:
+    # the backend issues Secure session cookies in Production, which browsers
+    # drop over plain HTTP, so login does not work against the raw ALB hostname.
+    # See docs/16-deployment.md "HTTPS via the CloudFront default domain".
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
 spec:
   ingressClassName: alb
   rules:

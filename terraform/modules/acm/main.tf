@@ -1,7 +1,14 @@
 # ACM module: a DNS-validated ACM certificate for the platform's own public HTTPS
-# endpoint (the ALB Ingress), validated through an existing Route53 hosted zone (see
-# docs/05-aws-architecture.md "HTTPS and Custom Domain", docs/06-terraform.md
-# "ACM Module" and docs/16-deployment.md "HTTPS, certificates and DNS").
+# endpoint (the ALB Ingress), validated through an existing Route53 hosted zone.
+#
+# DORMANT — not wired into any environment. The platform is served over HTTPS on
+# the default *.cloudfront.net domain of the platform CloudFront distribution
+# instead (modules/cloudfront-platform), so no custom domain or certificate is
+# required (see docs/16-deployment.md "HTTPS via the CloudFront default domain").
+# The module is kept, unused, to make custom-domain support easy to reintroduce:
+# re-add the module call plus domain_name/hosted_zone_name variables in the
+# environment, put the certificate on the CloudFront distribution (or an ALB
+# HTTPS listener), and point a Route53 alias at the chosen entry point.
 #
 # The certificate is regional (same region as the ALB) — unlike the CloudFront
 # distribution for user sites, which uses its own default *.cloudfront.net cert.

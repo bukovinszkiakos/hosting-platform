@@ -5,8 +5,8 @@ name: Deploy (manual)
 # Scope: deploy the application to an ALREADY-PROVISIONED EKS cluster (apply the
 # Kubernetes manifests and wait for the rollout). Infrastructure provisioning
 # (`terraform apply`), container image build/push, the AWS Load Balancer Controller
-# install, the ACM certificate, and the ConfigMap/Secret are one-time bootstrap steps
-# performed manually — see docs/16-deployment.md. This keeps the automated path safe
+# install, and the ConfigMap/Secret are one-time bootstrap steps performed
+# manually — see docs/16-deployment.md. This keeps the automated path safe
 # and idempotent and avoids running state-sensitive `terraform apply` from an
 # ephemeral runner. Database migrations ARE applied here, as an idempotent one-off Job
 # run before the rollout (see the "Run database migrations" step).
@@ -56,14 +56,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
         run: |
           set -euo pipefail
           missing=()
           [ -n "$AWS_ACCESS_KEY_ID" ]     || missing+=("AWS_ACCESS_KEY_ID")
           [ -n "$AWS_SECRET_ACCESS_KEY" ] || missing+=("AWS_SECRET_ACCESS_KEY")
           [ -n "$AWS_REGION" ]            || missing+=("AWS_REGION")
-          [ -n "$ACM_CERTIFICATE_ARN" ]   || missing+=("ACM_CERTIFICATE_ARN")
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::Missing required secrets: ${missing[*]} (see docs/16-deployment.md)"
             exit 1
@@ -110,12 +108,12 @@ jobs:
           set -euo pipefail
           # The Ingress applied at the end of this workflow only provisions an ALB
           # if the AWS Load Balancer Controller is running in the cluster (one-time
-          # bootstrap step 4, see docs/16-deployment.md "AWS Load Balancer
+          # bootstrap step 3, see docs/16-deployment.md "AWS Load Balancer
           # Controller"). Without it, applying the Ingress SUCCEEDS silently and no
           # ALB is ever created — the deploy would go green with an unreachable
           # platform. Fail fast instead, like the ConfigMap/Secret check above.
           if ! kubectl -n kube-system get deployment aws-load-balancer-controller >/dev/null 2>&1; then
-            echo "::error::AWS Load Balancer Controller is not installed (no deployment/aws-load-balancer-controller in kube-system). The Ingress cannot provision an ALB without it. Run scripts/deployment/install-alb-controller.sh ${{ inputs.environment }} (bootstrap step 4, docs/16-deployment.md)."
+            echo "::error::AWS Load Balancer Controller is not installed (no deployment/aws-load-balancer-controller in kube-system). The Ingress cannot provision an ALB without it. Run scripts/deployment/install-alb-controller.sh ${{ inputs.environment }} (bootstrap step 3, docs/16-deployment.md)."
             exit 1
           fi
           echo "AWS Load Balancer Controller is installed."
@@ -185,14 +183,13 @@ jobs:
           kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=180s
 
       - name: Apply ingress
-        env:
-          ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
         run: |
           set -euo pipefail
           # Applied after a healthy rollout so the ALB registers healthy targets.
-          # The manifest keeps a placeholder cert ARN in the repo; inject the real
-          # one from the secret at apply time.
-          sed "s#REPLACE_WITH_ACM_CERTIFICATE_ARN#${ACM_CERTIFICATE_ARN}#" k8s/ingress/alb-ingress.yaml | kubectl apply -f -
+          # HTTP-only listener: TLS terminates at the platform CloudFront
+          # distribution that fronts this ALB (see docs/16-deployment.md "HTTPS
+          # via the CloudFront default domain"), so no certificate is injected.
+          kubectl apply -f k8s/ingress/alb-ingress.yaml
 
       - name: Deployment summary
         if: always()
@@ -209,7 +206,8 @@ jobs:
             echo '```'
             alb="$(kubectl -n "$NAMESPACE" get ingress hosting-platform -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
             if [ -n "$alb" ]; then
-              echo "- ALB hostname: \`$alb\`"
+              echo "- ALB hostname (CloudFront origin, HTTP only — not the public URL): \`$alb\`"
+              echo "- Platform URL: \`https://\$(terraform output -raw platform_cloudfront_domain_name)\` — on the FIRST deploy, set \`alb_dns_name = \"$alb\"\` in terraform.tfvars and re-apply to create the platform CloudFront distribution (docs/16-deployment.md)."
             else
               echo "- ALB hostname: still provisioning — check \`kubectl -n $NAMESPACE get ingress\` shortly."
             fi

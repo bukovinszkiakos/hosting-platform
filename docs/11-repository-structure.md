@@ -192,8 +192,9 @@ modules/
 ├── rds/
 ├── s3/
 ├── cloudfront/
+├── cloudfront-platform/
 ├── ecr/
-├── acm/
+├── acm/          (dormant — kept for future custom-domain support)
 └── iam/
 ```
 

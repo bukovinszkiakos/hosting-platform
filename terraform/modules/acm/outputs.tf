@@ -1,5 +1,5 @@
 output "certificate_arn" {
-  description = "ARN of the validated ACM certificate for the platform domain (feeds the ALB Ingress via the ACM_CERTIFICATE_ARN secret), or null when no domain is configured."
+  description = "ARN of the validated ACM certificate for the platform domain (attach to the chosen HTTPS entry point when re-enabling custom-domain support), or null when no domain is configured."
   value       = local.enabled ? aws_acm_certificate_validation.this[0].certificate_arn : null
 }
 

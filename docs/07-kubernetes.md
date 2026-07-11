@@ -365,26 +365,28 @@ version (currently `v2.11.x`), so the installed controller version must match.
 
 ## HTTPS
 
-The ALB terminates **HTTPS**, and the HTTP listener redirects to it
-(`listen-ports` + `ssl-redirect` annotations). This is required, not optional:
-the backend runs in Production mode and issues `Secure` session cookies, which
-browsers drop over plain HTTP — so serving the app over HTTP would silently break
-authentication. HTTPS on the ALB needs an **ACM certificate** (and therefore a
-domain), supplied via the `certificate-arn` annotation. This makes a domain + ACM
-a production prerequisite for the application endpoint (published sites already
-get HTTPS via CloudFront).
+The ALB exposes an **HTTP-only listener** (`listen-ports: '[{"HTTP": 80}]'`,
+no certificate annotation): ACM cannot issue a certificate for an AWS-owned
+`*.elb.amazonaws.com` name, and the project deliberately uses no custom domain.
+TLS terminates instead at the **platform CloudFront distribution**
+(`terraform/modules/cloudfront-platform`), which fronts this ALB as its origin
+and serves HTTPS on its default `*.cloudfront.net` domain.
 
-The ACM certificate is DNS-validated and created by Terraform (see
-`06-terraform.md` "ACM Module"); its ARN is stored in the `ACM_CERTIFICATE_ARN`
-secret and `deploy.yml` injects it into this annotation at apply time. The domain's
-Route53 hosted zone and the post-deploy alias record pointing at the ALB are manual
-one-time steps — see `16-deployment.md` "HTTPS, certificates and DNS".
+HTTPS is still required, not optional: the backend runs in Production mode and
+issues `Secure` session cookies, which browsers drop over plain HTTP — so the
+platform must be used through the CloudFront URL. Against the raw ALB hostname
+the app loads but login silently fails; this direct-HTTP bypass is an accepted,
+documented limitation (published sites already get HTTPS via the other
+CloudFront distribution). See `16-deployment.md` "HTTPS via the CloudFront
+default domain".
 
 ## Architecture
 
 ```text
 Internet
-    ↓
+    ↓ HTTPS
+Platform CloudFront distribution (*.cloudfront.net)
+    ↓ HTTP
 Application Load Balancer
     ↓
 Ingress

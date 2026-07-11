@@ -15,3 +15,4 @@ k8s/secrets/*.yaml
 !k8s/secrets/*.example.yaml
 k8s/base/configmap.yaml
  PROJECT_HANDOFF_2026-07-09
+ PROJECT_HANDOFF_2026-07-10
