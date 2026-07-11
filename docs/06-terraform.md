@@ -204,7 +204,14 @@ including recovery and intentional teardown.
   "Horizontal Pod Autoscaler"; runs on the existing nodes, no additional AWS
   cost)
 
-The API endpoint has both private and public access enabled. `kubernetes_version`
+The API endpoint has both private and public access enabled. The cluster's
+authentication mode is set explicitly to `API_AND_CONFIG_MAP`: the CI deploy
+principal is granted cluster access via an **EKS access entry**
+(`16-deployment.md` bootstrap step 6), which access entries require — clusters
+created through the API/Terraform would otherwise default to `CONFIG_MAP`,
+where `create-access-entry` is rejected. The cluster creator retains admin
+access (`bootstrap_cluster_creator_admin_permissions = true`).
+`kubernetes_version`
 defaults to an EKS standard-support release (currently `1.34`) to avoid
 extended-support pricing; verify the standard-support range at deploy time.
 `cluster_endpoint_public_access_cidrs` defaults to open (dev); in **prod** the

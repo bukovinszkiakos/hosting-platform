@@ -66,6 +66,18 @@ resource "aws_eks_cluster" "this" {
   role_arn = aws_iam_role.cluster.arn
   version  = var.kubernetes_version
 
+  # EKS access entries need API_AND_CONFIG_MAP (or API) authentication — the CI
+  # deploy principal is granted cluster access via `aws eks create-access-entry`
+  # (docs/16-deployment.md bootstrap step 6), which is REJECTED on a CONFIG_MAP
+  # cluster. Clusters created through the API/SDK (i.e. Terraform) default to
+  # CONFIG_MAP, so the mode must be set explicitly. The cluster creator keeps
+  # admin access (bootstrap_cluster_creator_admin_permissions is the API
+  # default, stated here for clarity).
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   vpc_config {
     subnet_ids = var.private_subnet_ids
 
