@@ -276,6 +276,7 @@ not an output (it would be printed in plaintext); it is supplied out-of-band.
 
 * bucket_name
 * bucket_arn
+* bucket_regional_domain_name
 
 ---
 
@@ -292,6 +293,8 @@ not an output (it would be printed in plaintext); it is supplied out-of-band.
 ## Inputs
 
 * bucket_name
+* bucket_regional_domain_name (from the s3 module — not a data-source lookup, which
+  would fail at plan time while the bucket does not exist yet)
 
 ## Outputs
 

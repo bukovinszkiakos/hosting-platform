@@ -26,12 +26,6 @@ resource "aws_cloudfront_function" "index_rewrite" {
   code    = file("${path.module}/index-rewrite.js")
 }
 
-# Resolve the bucket's regional domain name from just its name (the documented
-# module input). Read at plan time, so it is not evaluated by terraform validate.
-data "aws_s3_bucket" "hosting" {
-  bucket = var.bucket_name
-}
-
 # AWS-managed cache policy tuned for static content; avoids the deprecated
 # forwarded_values block.
 data "aws_cloudfront_cache_policy" "optimized" {
@@ -47,7 +41,7 @@ resource "aws_cloudfront_distribution" "this" {
 
   origin {
     origin_id   = local.origin_id
-    domain_name = data.aws_s3_bucket.hosting.bucket_regional_domain_name
+    domain_name = var.bucket_regional_domain_name
 
     # Empty origin access identity: the bucket is public, so no OAI is used.
     s3_origin_config {

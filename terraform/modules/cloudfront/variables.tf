@@ -8,6 +8,11 @@ variable "bucket_name" {
   }
 }
 
+variable "bucket_regional_domain_name" {
+  type        = string
+  description = "Regional domain name of the S3 hosting bucket (the CloudFront origin). Pass the s3 module's bucket_regional_domain_name output — a data-source lookup by name would fail at plan time while the bucket does not exist yet."
+}
+
 variable "price_class" {
   type        = string
   description = "CloudFront price class. PriceClass_100 (US/EU edges) keeps dev costs lowest."

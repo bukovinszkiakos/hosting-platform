@@ -94,7 +94,8 @@ module "s3" {
 module "cloudfront" {
   source = "../../modules/cloudfront"
 
-  bucket_name = module.s3.bucket_name
+  bucket_name                 = module.s3.bucket_name
+  bucket_regional_domain_name = module.s3.bucket_regional_domain_name
 
   # Serve from all edge locations in production.
   price_class = "PriceClass_All"
