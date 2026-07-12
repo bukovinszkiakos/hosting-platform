@@ -8,16 +8,15 @@ terraform {
     }
   }
 
-  # Uncomment after backend resources are provisioned (see terraform/backend/).
   # use_lockfile enables S3 native state locking (Terraform >= 1.11), so no
   # DynamoDB table is required (see docs/06-terraform.md "Remote State").
-  # backend "s3" {
-  #   bucket       = "hosting-platform-tfstate"
-  #   key          = "dev/terraform.tfstate"
-  #   region       = "eu-central-1"
-  #   use_lockfile = true
-  #   encrypt      = true
-  # }
+  backend "s3" {
+    bucket       = "hosting-platform-tfstate"
+    key          = "dev/terraform.tfstate"
+    region       = "eu-central-1"
+    use_lockfile = true
+    encrypt      = true
+  }
 }
 
 provider "aws" {
