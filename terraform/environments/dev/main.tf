@@ -78,6 +78,11 @@ module "s3" {
   source = "../../modules/s3"
 
   bucket_name = var.hosting_bucket_name
+
+  # Dev is ephemeral: allow 'terraform destroy' to remove the hosting bucket even
+  # when it still holds published site objects (mirrors ecr force_delete and rds
+  # skip_final_snapshot). Prevents BucketNotEmpty teardown failures.
+  force_destroy = true
 }
 
 module "cloudfront" {

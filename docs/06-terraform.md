@@ -272,6 +272,14 @@ not an output (it would be printed in plaintext); it is supplied out-of-band.
 * Create Bucket Policies
 * Configure Public Access Settings
 
+## force_destroy
+
+The `force_destroy` variable (default `false`) lets `terraform destroy` remove
+the bucket even when it still holds published site objects. It is `true` in
+`dev` (ephemeral — mirrors ECR `force_delete` and RDS `skip_final_snapshot`, so
+teardown never fails with `BucketNotEmpty`) and `false` in `prod` (published
+content must never be deleted silently). See `16-deployment.md` "Teardown order".
+
 ## Outputs
 
 * bucket_name

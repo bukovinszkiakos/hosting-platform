@@ -11,6 +11,10 @@
 resource "aws_s3_bucket" "hosting" {
   bucket = var.bucket_name
 
+  # When true, 'terraform destroy' empties and removes the bucket even if it still
+  # holds published site objects (see variable docs). Gated per environment.
+  force_destroy = var.force_destroy
+
   tags = {
     Name = var.bucket_name
   }

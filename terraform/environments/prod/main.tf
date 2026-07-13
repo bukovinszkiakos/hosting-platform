@@ -89,6 +89,11 @@ module "s3" {
   source = "../../modules/s3"
 
   bucket_name = var.hosting_bucket_name
+
+  # Prod: never let 'terraform destroy' silently delete published site content.
+  # Emptying the bucket must be a deliberate manual step. (Default is false; set
+  # explicitly to document the posture.)
+  force_destroy = false
 }
 
 module "cloudfront" {

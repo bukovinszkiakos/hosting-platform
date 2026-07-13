@@ -881,12 +881,35 @@ up between demos costs ~$210/month for near-zero traffic.
 
 ## Teardown order (avoid orphaned, still-billing resources)
 
-**The ALB is created by the AWS Load Balancer Controller, not by Terraform.**
-So `terraform destroy` does **not** delete it — running destroy first leaves the
-ALB (and its target groups) alive and **still billing (~$20/month)**, and the
-dangling network interfaces can also make the VPC destroy hang. You would think
-everything is torn down while an invisible load balancer keeps charging your
-card. Always delete the Ingress first and wait for the ALB to disappear:
+**The ALB — and the security groups it uses — are created by the AWS Load
+Balancer Controller, not by Terraform.** They live in the Terraform-managed VPC
+but are absent from Terraform state, so `terraform destroy` has no dependency
+edge to them: run alone, it races ahead of AWS's asynchronous ALB teardown and
+fails with `DependencyViolation` on the subnets / Internet Gateway / VPC, leaves
+the ALB **still billing (~$20/month)**, and orphans the controller's security
+groups. The fix is ordering + waiting, which Terraform cannot express for
+resources it does not manage.
+
+### Supported path — `destroy.sh` (one command)
+
+```bash
+scripts/deployment/destroy.sh dev            # add --auto-approve to skip the prompt
+```
+
+The script automates the correct order with real waits so no manual AWS cleanup
+is needed: it deletes the Ingress (so the controller removes the ALB and its own
+SGs), **waits** for the ALB to actually disappear (deleting it directly as a
+fallback if the controller is already gone), sweeps the controller's leftover
+security groups (tag-scoped to `elbv2.k8s.aws/cluster`, so Terraform-managed SGs
+are never touched), empties the hosting bucket, runs `terraform destroy`, and
+verifies nothing billable survived. It is idempotent and recovers from a
+half-destroyed environment. A stale S3 state lock is detected and reported; pass
+`--force-unlock` to release it (never done silently — unsafe if another run is
+active). The hosting bucket also has `force_destroy = true` in `dev` (see
+`06-terraform.md` "S3 Module"), so `terraform destroy` removes it even if it
+still holds published sites; `prod` keeps `force_destroy = false`.
+
+### Manual fallback (if the script is unavailable)
 
 ```bash
 # 1. Delete the Ingress; the controller then deletes the ALB it created.
@@ -897,7 +920,13 @@ kubectl -n hosting-platform delete ingress hosting-platform
 aws elbv2 describe-load-balancers --region "$AWS_REGION" \
   --query "LoadBalancers[].LoadBalancerName" --output text
 
-# 3. Only now destroy the infrastructure.
+# 3. Delete any leftover controller security groups (tagged for the cluster):
+aws ec2 describe-security-groups \
+  --filters "Name=vpc-id,Values=<vpc-id>" \
+  "Name=tag:elbv2.k8s.aws/cluster,Values=hosting-platform-dev-eks" \
+  --query "SecurityGroups[].GroupId" --output text
+
+# 4. Only now destroy the infrastructure.
 terraform -chdir=terraform/environments/dev destroy
 ```
 

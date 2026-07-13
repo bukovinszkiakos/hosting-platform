@@ -7,3 +7,9 @@ variable "bucket_name" {
     error_message = "bucket_name must be a valid S3 bucket name (3-63 chars: lowercase letters, numbers, hyphens, dots)."
   }
 }
+
+variable "force_destroy" {
+  type        = bool
+  description = "Allow 'terraform destroy' to delete the bucket even when it still holds published site objects. Enable in ephemeral environments (dev) so teardown never fails with BucketNotEmpty; keep disabled in prod so published content is never silently deleted."
+  default     = false
+}

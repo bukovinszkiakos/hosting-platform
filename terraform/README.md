@@ -154,11 +154,14 @@ terraform apply
   `terraform -chdir=terraform/backend destroy`. Do this only after every
   environment has been destroyed.
 
-> **Destroying an environment:** the ALB is created by the AWS Load Balancer
-> Controller, **not** Terraform, so `terraform destroy` will not remove it —
-> delete the Kubernetes Ingress and wait for the ALB to disappear **before**
-> running destroy, or it keeps billing and can block the VPC teardown. This is a
-> portfolio project: destroy `dev` between demos (it is designed to be
+> **Destroying an environment:** use `scripts/deployment/destroy.sh <env>` — a
+> single command that tears everything down without manual AWS cleanup. The ALB
+> and its security groups are created by the AWS Load Balancer Controller, **not**
+> Terraform, so a bare `terraform destroy` races ahead of AWS's asynchronous ALB
+> teardown (DependencyViolation on the subnets/IGW/VPC) and orphans billing
+> resources; the script deletes the Ingress first, waits for the ALB and its SGs
+> to disappear, empties the hosting bucket, then runs `terraform destroy`. This is
+> a portfolio project: destroy `dev` between demos (it is designed to be
 > disposable) rather than leaving it idling at ~$7/day. Full runbook:
 > `docs/16-deployment.md` "Cost and teardown".
 
