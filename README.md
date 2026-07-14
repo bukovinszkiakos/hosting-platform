@@ -12,6 +12,45 @@ specification (the `docs` directory is the source of truth).
 To run a guided demo (local walkthrough + full AWS demo steps), see
 [`docs/15-demo.md`](docs/15-demo.md).
 
+## Quick Start — deploy to AWS
+
+Four commands run the whole platform lifecycle. Prerequisites: `aws` (authenticated),
+`terraform` ≥ 1.11, `kubectl`, `helm`, `docker` (with buildx), and the GitHub CLI
+`gh` (`gh auth login`). The Terraform remote-state bucket must already exist
+(`scripts/terraform/bootstrap-remote-state.sh` — one-time).
+
+```bash
+git clone <repo> && cd hosting-platform
+
+# 1. Deploy everything (empty account → live platform). First run only: you are
+#    prompted once for a DB master password, stored write-once in SSM Parameter
+#    Store (SecureString) and reused automatically on every later run.
+scripts/deployment/up.sh dev
+
+# 2. Daily loop — ship a code change (build+push new image, redeploy, verify):
+scripts/deployment/up.sh dev --app
+
+# 3. Check health / find the public URL:
+scripts/deployment/status.sh dev
+
+# 4. Tail logs (backend | frontend | migrations | build --latest):
+scripts/deployment/logs.sh backend
+
+# 5. Tear it all down (no manual AWS cleanup):
+scripts/deployment/destroy.sh dev
+```
+
+`up.sh` orchestrates the documented bootstrap end-to-end — `terraform apply`,
+the ALB controller, image build/push, config, the EKS access entry, triggering
+`deploy.yml`, waiting for the ALB, and the second `terraform apply` that creates
+the platform CloudFront distribution — then prints the public URL. Terraform
+stays the infrastructure source of truth and GitHub Actions stays the deploy
+mechanism; `up.sh` only sequences them. See
+[`docs/16-deployment.md`](docs/16-deployment.md) for the full internals, the SSM
+password design, and `alb_dns_name.auto.tfvars`.
+
+> 💸 Idle `dev` costs ~$210/mo. Run `scripts/deployment/destroy.sh dev` when done.
+
 ## Prerequisites
 
 - .NET 8 SDK
@@ -117,14 +156,15 @@ CI is build/validate only. Deployment is a separate, **manual** workflow.
 
 ## Deployment
 
-Deploying to AWS is a manual (`workflow_dispatch`) workflow
+The supported path is the [Quick Start](#quick-start--deploy-to-aws) above:
+`scripts/deployment/up.sh dev` orchestrates the whole bootstrap, and
+`destroy.sh dev` tears it down. Under the hood, the application deploy itself is
+a manual (`workflow_dispatch`) GitHub Actions workflow
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) that applies the
-Kubernetes manifests to an already-provisioned EKS cluster and waits for the
-rollout. Provisioning infrastructure (`terraform apply`), building/pushing images,
-installing the AWS Load Balancer Controller, and the ConfigMap/Secret are
-one-time **manual bootstrap** steps; the platform is served over HTTPS on its
-CloudFront distribution's default `*.cloudfront.net` domain (no custom domain
-required).
-See [`docs/16-deployment.md`](docs/16-deployment.md) for the full process,
-required GitHub Secrets, deployment order, bootstrap requirements, rollback, and
-limitations.
+Kubernetes manifests to the EKS cluster and waits for the rollout — `up.sh`
+triggers and watches it. The platform is served over HTTPS on its CloudFront
+distribution's default `*.cloudfront.net` domain (no custom domain required).
+
+See [`docs/16-deployment.md`](docs/16-deployment.md) for the full process — the
+`up.sh` phases, the SSM write-once password design, `alb_dns_name.auto.tfvars`,
+required GitHub Secrets, deployment order, rollback, and limitations.

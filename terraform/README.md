@@ -42,7 +42,15 @@ Both environments compose the same modules; they differ only in variables:
 
 ## Deploy
 
-The database password is **never committed**. Provide it out-of-band:
+The supported path is **`scripts/deployment/up.sh <env>`**, which runs both
+Terraform applies in the correct order and manages everything below for you (see
+`docs/16-deployment.md` "One-command deploy (up.sh)"). The notes here describe
+what it does under the hood / how to run Terraform by hand.
+
+The database password is **never committed**. Its canonical store is a write-once
+**SSM `SecureString`** at `/hosting-platform/<env>/db_password`; `up.sh` reads it
+and injects it as `TF_VAR_db_password`. To run Terraform directly instead, export
+it yourself:
 
 ```bash
 export TF_VAR_db_password="<strong-password>"
@@ -51,18 +59,21 @@ export TF_VAR_db_password="<strong-password>"
 Use letters, digits and `!#$%^&*()_+.,:?~-` only — RDS forbids `/ @ "` and
 spaces, and `; ' =` would corrupt the connection string that
 `scripts/deployment/bootstrap-config.sh` builds. Both the variable validation and
-the script enforce this.
+the script enforce this. The RDS instance uses `ignore_changes = [password]`, so
+apply never resets the live master password — rotation is a deliberate out-of-band
+runbook (see `docs/16-deployment.md`).
 
 `hosting_bucket_name` in `terraform.tfvars` must be globally unique across all of
 AWS S3 — adjust it if the default name is taken.
 
 The platform is served over HTTPS on the default `*.cloudfront.net` domain of
 the platform CloudFront distribution — no custom domain or certificate needed.
-The distribution is created by a **second apply after the first deploy**: set
-`alb_dns_name` in `terraform.tfvars` to the ALB hostname the deploy created,
-then re-apply (see `docs/16-deployment.md` "HTTPS via the CloudFront default
-domain"). Left empty (the default), the module is a no-op and the environment
-still applies.
+The distribution is created by a **second apply after the first deploy**: the ALB
+hostname the deploy created is written to the gitignored
+`environments/<env>/alb_dns_name.auto.tfvars` (Terraform auto-loads it; `up.sh`
+Phase 8 writes it) and Terraform is re-applied. Left empty (the default), the
+module is a no-op and the environment still applies. Do not set `alb_dns_name` in
+the committed `terraform.tfvars` by hand.
 
 **Prod only:** `cluster_endpoint_public_access_cidrs` is a required variable with
 no default — a production apply must explicitly list the trusted administration

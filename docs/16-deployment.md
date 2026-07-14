@@ -19,6 +19,65 @@ it stays a deliberate manual operation run by an operator who controls the state
 
 ---
 
+# One-command deploy (`up.sh`)
+
+`scripts/deployment/up.sh <env>` is the **official supported workflow**. It
+**orchestrates** the bootstrap steps below in the required order with real waits
+and fail-fast handling — it does not replace them: Terraform stays the
+infrastructure source of truth and `deploy.yml` stays the deployment mechanism;
+`up.sh` only sequences them. It reuses `install-alb-controller.sh` and
+`bootstrap-config.sh` rather than duplicating their logic.
+
+Phases: **0** preflight (tools, AWS auth, region, state bucket, DB password) →
+**1** `terraform apply` (infra) → **2** ALB controller → **3** build+push images
+(tagged by git SHA; skipped if the tag already exists) → **4** ConfigMaps+Secret
+→ **5** EKS access entry for `hosting-platform-deploy` → **6** trigger+watch
+`deploy.yml` (via `gh`; prints manual dispatch if `gh` is absent) → **7** wait
+for the ALB → **8** second `terraform apply` (platform CloudFront) → **9** verify
++ summary (prints the public URL). It is **idempotent** — re-running after a
+failure resumes cleanly; there is no rollback (nothing is auto-destroyed).
+
+* **`up.sh dev`** — full bootstrap, empty account → live platform.
+* **`up.sh dev --app`** — application-only redeploy (build+push a new image,
+  trigger `deploy.yml`, verify); skips infra/controller/config/CloudFront. Errors
+  out if the environment does not already exist.
+
+Prerequisites: `aws`, `terraform` ≥ 1.11, `kubectl`, `helm`, `docker` (buildx),
+and `gh` (authenticated) for the fully-automated Phase 6.
+
+Companion commands: `status.sh <env>` (health dashboard + public URL),
+`logs.sh <backend|frontend|migrations|build --latest>`, `destroy.sh <env>`.
+
+## Database password (SSM Parameter Store, write-once)
+
+The RDS master password is stored **once** in **SSM Parameter Store as a
+`SecureString`** at `/hosting-platform/<env>/db_password` — the canonical source
+of truth. On the first `up.sh` run (no parameter yet) you are prompted once and
+the value is created **write-once** (`put-parameter` **without** `--overwrite`,
+so an existing parameter is never modified). On every later run `up.sh` reads it
+back and injects the same value into both Terraform (`TF_VAR_db_password`) and
+`bootstrap-config.sh` (`DB_PASSWORD`) — read once per run, never exported into
+your interactive shell, never written to disk or Git.
+
+The RDS instance uses `lifecycle { ignore_changes = [password] }`, so a
+`terraform apply` can **never** silently reset the live master password (even if
+the SSM value were tampered with). Consequence: password **rotation is a
+deliberate out-of-band runbook** (change it in RDS → update the SSM parameter →
+`bootstrap-config.sh` → restart the backend), never a side effect of apply. Cost
+is $0 (standard-tier SecureString + the free AWS-managed `aws/ssm` KMS key).
+
+## `alb_dns_name.auto.tfvars` (machine-managed)
+
+The two-phase apply's ALB hostname lives in
+`terraform/environments/<env>/alb_dns_name.auto.tfvars`, which Terraform
+auto-loads and `up.sh` writes: empty in Phase 1 (so the platform CloudFront
+module is skipped before the ALB exists) and the discovered hostname in Phase 8.
+It is **gitignored** — the human-edited `terraform.tfvars` stays clean and the
+machine-managed value never lands in Git. Do not edit `terraform.tfvars`'s
+`alb_dns_name` by hand anymore.
+
+---
+
 # Deployment order
 
 ```text
@@ -38,10 +97,11 @@ Repeatable (automated — deploy.yml, workflow_dispatch)
  11. Apply the Ingress (HTTP-only listener; the ALB is created on the first apply)
  12. Print a deployment summary
 
-After the first deploy (one-time per environment lifetime): set alb_dns_name in
-terraform.tfvars to the new ALB's hostname and `terraform apply` again — this
-creates the platform CloudFront distribution, whose default *.cloudfront.net
-domain is the platform's public HTTPS URL (see "HTTPS via the CloudFront
+After the first deploy (one-time per environment lifetime): the new ALB's
+hostname is written to `alb_dns_name.auto.tfvars` and `terraform apply` runs
+again — this creates the platform CloudFront distribution, whose default
+*.cloudfront.net domain is the platform's public HTTPS URL. `up.sh` does both
+automatically (Phases 7–8); the manual equivalent is below (see "HTTPS via the CloudFront
 default domain").
 ```
 
@@ -388,10 +448,13 @@ updates the values in place. The `k8s/base/configmap.example.yaml` and
 
 Only the **database password** (`DB_PASSWORD`). It is deliberately **not** a
 Terraform output: exposing it via `terraform output` would print it in plaintext
-and make it trivial to capture in logs/CI. It is supplied out-of-band (the same
-value as `TF_VAR_db_password`) and only ever lands in the Kubernetes Secret — never
-on disk, never in Git. `.gitignore` also blocks committing real
-`k8s/secrets/*.yaml` / `k8s/base/configmap.yaml` files as defense-in-depth.
+and make it trivial to capture in logs/CI. Its canonical store is the write-once
+**SSM `SecureString`** at `/hosting-platform/<env>/db_password` (see "Database
+password" above); `up.sh` reads it once and passes the same value to Terraform
+(`TF_VAR_db_password`) and to this script (`DB_PASSWORD`). It only ever lands in
+the Kubernetes Secret — never on disk, never in Git. `.gitignore` also blocks
+committing real `k8s/secrets/*.yaml` / `k8s/base/configmap.yaml` files as
+defense-in-depth.
 
 **Password characters:** use letters, digits and the symbols
 `! # $ % ^ & * ( ) _ + . , : ? ~ -` only. RDS forbids `/`, `@`, `"` and
@@ -409,9 +472,16 @@ Manager + ESO, below) is the production fix.
 
 ## Operational procedure
 
-* **Rotate the DB password:** change it in RDS, re-run the script with the new
-  `DB_PASSWORD`, then restart the backend (`kubectl -n hosting-platform rollout
-  restart deployment/backend`) so it picks up the new Secret.
+* **Rotate the DB password (deliberate, out-of-band):** because the RDS instance
+  uses `lifecycle { ignore_changes = [password] }`, `terraform apply` will not
+  change it — rotation is intentional and manual. Change it in RDS
+  (`aws rds modify-db-instance --master-user-password …`), **overwrite the SSM
+  parameter** (`aws ssm put-parameter --name /hosting-platform/<env>/db_password
+  --type SecureString --value … --overwrite`), re-run `bootstrap-config.sh` (or
+  `up.sh <env> --app` after it), then restart the backend
+  (`kubectl -n hosting-platform rollout restart deployment/backend`) so it picks
+  up the new Secret. This is the *only* time the write-once SSM value is
+  overwritten.
 * **Change an AWS value** (e.g. a new bucket/CloudFront after a Terraform change):
   re-run the script; it re-reads the outputs and updates `backend-config`.
 
@@ -604,9 +674,10 @@ not created), the same pattern the dormant ACM module used for `domain_name`:
    platform distribution is created.
 2. First `deploy.yml` run applies the Ingress; the controller provisions the ALB.
 3. Read the ALB hostname (deploy summary, or
-   `kubectl -n hosting-platform get ingress hosting-platform`), set
-   `alb_dns_name = "<that hostname>"` in the environment `terraform.tfvars`,
-   and `terraform apply` again (~5 min while CloudFront deploys globally).
+   `kubectl -n hosting-platform get ingress hosting-platform`), write
+   `alb_dns_name = "<that hostname>"` into the environment's
+   `alb_dns_name.auto.tfvars` (gitignored; `up.sh` does this in Phase 8), and
+   `terraform apply` again (~5 min while CloudFront deploys globally).
 4. `terraform output -raw platform_cloudfront_domain_name` is now the platform's
    public HTTPS URL: `https://dxxxxxxxx.cloudfront.net`.
 

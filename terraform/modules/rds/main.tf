@@ -67,4 +67,14 @@ resource "aws_db_instance" "this" {
   tags = {
     Name = "${var.name_prefix}-postgres"
   }
+
+  # The master password is set ONCE at creation from the value in SSM Parameter
+  # Store (the canonical, write-once source of truth — see docs/16-deployment.md
+  # "Database password"). Ignoring later changes makes it structurally impossible
+  # for a subsequent `terraform apply` to silently reset the live master password
+  # (e.g. if the SSM value were tampered with). Rotation is therefore a deliberate
+  # out-of-band runbook, never a side effect of apply.
+  lifecycle {
+    ignore_changes = [password]
+  }
 }

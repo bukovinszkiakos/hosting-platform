@@ -16,3 +16,9 @@ k8s/secrets/*.yaml
 k8s/base/configmap.yaml
  PROJECT_HANDOFF_2026-07-09
  PROJECT_HANDOFF_2026-07-10
+
+# Machine-managed by scripts/deployment/up.sh: holds the discovered ALB hostname
+# for the two-phase platform-CloudFront apply. Terraform auto-loads *.auto.tfvars.
+# Never committed — the human-edited terraform.tfvars stays the readable source.
+terraform/environments/*/alb_dns_name.auto.tfvars
+ PROJECT_HANDOFF_2026-07-13.md

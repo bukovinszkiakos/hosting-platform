@@ -250,6 +250,15 @@ environment): `deletion_protection`, `final_snapshot_identifier` (required when
 `skip_final_snapshot = false`), and `max_allocated_storage` (storage autoscaling
 cap). Dev leaves these at their cheaper defaults.
 
+## Master password
+
+The instance has `lifecycle { ignore_changes = [password] }`. The master
+password is set **once at creation** from `var.db_password` (which `up.sh`
+injects from the write-once SSM `SecureString` — see `16-deployment.md`
+"Database password") and Terraform never modifies it again, so a later
+`terraform apply` can never silently reset the live credential. Rotation is a
+deliberate out-of-band runbook, not a side effect of apply.
+
 ## Outputs
 
 * database_endpoint
@@ -396,9 +405,10 @@ default domain").
 * **Gated on `alb_dns_name` (two-phase apply).** The ALB is created by the AWS
   Load Balancer Controller when the Ingress is first applied, so its DNS name is
   unknown on the initial `terraform apply`. Apply once with the default, run the
-  first deploy, then set `alb_dns_name` in `terraform.tfvars` and apply again.
-  A teardown/re-bootstrap produces a new ALB hostname, so this step repeats per
-  environment lifetime.
+  first deploy, then write the ALB hostname into the gitignored
+  `environments/<env>/alb_dns_name.auto.tfvars` (Terraform auto-loads it; `up.sh`
+  Phase 8 does this) and apply again. A teardown/re-bootstrap produces a new ALB
+  hostname, so this step repeats per environment lifetime.
 * **Separate from the user-sites distribution.** User sites occupy the path root
   of theirs (`/{userId}/{projectId}`), which would collide with the platform
   frontend at `/`; a distribution has no fixed cost, so separation is free.
