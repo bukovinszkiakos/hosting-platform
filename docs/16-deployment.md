@@ -31,7 +31,7 @@ infrastructure source of truth and `deploy.yml` stays the deployment mechanism;
 Phases: **0** preflight (tools, AWS auth, region, state bucket, DB password) →
 **1** `terraform apply` (infra) → **2** ALB controller → **3** build+push images
 (tagged by git SHA; skipped if the tag already exists) → **4** ConfigMaps+Secret
-→ **5** EKS access entry for `hosting-platform-deploy` → **6** trigger+watch
+→ **5** verify the Terraform-managed OIDC deploy-role access entry → **6** trigger+watch
 `deploy.yml` (via `gh`; prints manual dispatch if `gh` is absent) → **7** wait
 for the ALB → **8** second `terraform apply` (platform CloudFront) → **9** verify
 + summary (prints the public URL). It is **idempotent** — re-running after a
@@ -184,30 +184,30 @@ Visitor                                   (https://<cloudfront-domain>/{userId}/
 
 # Required GitHub Secrets
 
-Set these at the repository level, or (preferred) on the `dev` / `prod` GitHub
-**Environments** so production can require a reviewer. The Environment names
-must be **exactly `dev` and `prod`** — `deploy.yml` sets
-`environment: ${{ inputs.environment }}`, so environment-scoped secrets are
-only picked up when the names match the workflow's input values:
+Set these on the `dev` / `prod` GitHub **Environments** so production can require a
+reviewer. The Environment names must be **exactly `dev` and `prod`** — `deploy.yml`
+sets `environment: ${{ inputs.environment }}`, so environment-scoped secrets are
+only picked up when the names match the workflow's input values. Because each
+environment has its **own** deploy role (dev and prod produce different
+`AWS_ROLE_ARN` values — the OIDC trust is scoped per environment), `AWS_ROLE_ARN`
+must be environment-scoped; a single repository-level value only works if you deploy
+just one environment:
 
 | Secret | Purpose |
 | --- | --- |
-| `AWS_ACCESS_KEY_ID` | IAM credentials the workflow deploys with |
-| `AWS_SECRET_ACCESS_KEY` | " |
+| `AWS_ROLE_ARN` | ARN of the GitHub Actions deploy role assumed via OIDC. Take it from the `github_actions_role_arn` Terraform output. |
 | `AWS_REGION` | AWS region of the cluster (e.g. `eu-central-1`) |
 
-The workflow validates all three are present before doing anything and fails early
-with a clear message if any is missing. The IAM principal these keys belong to
-must be created and granted cluster access first — bootstrap step 6, "CI deploy
-principal" below. Without it, the workflow authenticates to AWS but every
-`kubectl` command fails with an authorization error.
+The workflow authenticates with **GitHub OIDC** (no long-lived AWS keys): it
+requests a short-lived OIDC token (`id-token: write`) and `configure-aws-credentials`
+assumes `AWS_ROLE_ARN`, receiving temporary credentials scoped to that run. The
+workflow validates both secrets are present before doing anything and fails early
+with a clear message if either is missing.
 
-> **Security note (future hardening):** the workflow uses long-lived access keys
-> via GitHub Secrets, as requested. The recommended production approach is GitHub
-> OIDC federation (`aws-actions/configure-aws-credentials` with `role-to-assume`
-> and an IAM OIDC provider), which removes stored long-lived keys. This is
-> deferred because it requires an IAM OIDC provider + role that are not yet in
-> Terraform.
+The deploy role, its IAM OIDC provider, and its EKS access entry (cluster access)
+are all created by Terraform (`terraform/modules/iam/github-oidc.tf`) during the
+environment `apply` — no manual IAM user or access-entry step is required (see the
+former bootstrap step 6, now retired, below).
 
 ---
 
@@ -266,43 +266,30 @@ automated image publishing pipeline yet).
    the non-secret values from the Terraform outputs and the connection string from
    `DB_PASSWORD`, and applies all three objects idempotently. `deploy.yml` verifies
    they exist and fails early if not. See "Configuration and secrets bootstrap".
-6. **CI deploy principal (IAM user + EKS access entry)** — `deploy.yml`
-   authenticates with IAM user credentials, but IAM authentication alone grants
-   **no** Kubernetes permissions: the identity that ran `terraform apply` is
-   cluster admin automatically (the cluster-creator access entry), while any
-   other principal must be granted access explicitly via an **EKS access
-   entry**. Create the deploy user, grant it `eks:DescribeCluster` (all
-   `update-kubeconfig` needs), create its access entry, and store its keys as
-   the GitHub secrets:
+6. **CI deploy principal — now managed by Terraform (GitHub OIDC).** This step is
+   **retired**: `deploy.yml` authenticates via GitHub OIDC and assumes the
+   `hosting-platform-<env>-github-actions` role, which Terraform creates in step 2
+   along with the account-global IAM OIDC provider and the role's EKS access entry
+   (`terraform/modules/iam/github-oidc.tf`). IAM authentication alone grants **no**
+   Kubernetes permissions, so the role is mapped to the cluster via an EKS access
+   entry with `AmazonEKSClusterAdminPolicy` — the same authorization the former
+   IAM user had; Terraform now owns it.
+
+   The only manual action is setting the GitHub secrets once:
 
    ```bash
-   CLUSTER=hosting-platform-<env>-eks
-   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-   aws iam create-user --user-name hosting-platform-deploy
-   aws iam put-user-policy --user-name hosting-platform-deploy \
-     --policy-name eks-describe-cluster \
-     --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"eks:DescribeCluster","Resource":"arn:aws:eks:*:'"$ACCOUNT_ID"':cluster/hosting-platform-*"}]}'
-
-   aws eks create-access-entry --cluster-name "$CLUSTER" \
-     --principal-arn "arn:aws:iam::${ACCOUNT_ID}:user/hosting-platform-deploy"
-   aws eks associate-access-policy --cluster-name "$CLUSTER" \
-     --principal-arn "arn:aws:iam::${ACCOUNT_ID}:user/hosting-platform-deploy" \
-     --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
-     --access-scope type=cluster
-
-   aws iam create-access-key --user-name hosting-platform-deploy
-   # -> put AccessKeyId / SecretAccessKey into the AWS_ACCESS_KEY_ID /
-   #    AWS_SECRET_ACCESS_KEY GitHub secrets
+   # From the environment directory after `terraform apply`:
+   terraform output -raw github_actions_role_arn   # -> set as the AWS_ROLE_ARN secret
+   # AWS_REGION -> your cluster region, e.g. eu-central-1
    ```
 
-   `AmazonEKSClusterAdminPolicy` is deliberately broad for the MVP: the workflow
-   applies cluster-scoped objects (the namespace) and RBAC Roles/RoleBindings,
-   which narrower access policies cannot create without escalation privileges.
-   Scoping the deploy principal down (a dedicated access policy or namespace
-   scope plus a separate namespace-creation step) is a future hardening, as is
-   replacing the long-lived keys with GitHub OIDC federation (see the security
-   note above). Repeat the access entry per environment/cluster.
+   `AmazonEKSClusterAdminPolicy` is deliberately broad: the workflow applies
+   cluster-scoped objects (the namespace) and RBAC Roles/RoleBindings, which
+   narrower access policies cannot create without escalation privileges. Scoping
+   the deploy role's Kubernetes access down (a dedicated access policy or namespace
+   scope plus a separate namespace-creation step) is a future hardening. The OIDC
+   trust is already tightly scoped at the AWS layer: only this repository's `dev`/
+   `prod` GitHub Environment jobs can assume the matching role.
 
 > **Database schema** — no longer a manual bootstrap step. Migrations are applied
 > in-cluster by the migration Job that `deploy.yml` runs before every rollout (see
@@ -1049,7 +1036,6 @@ is still within standard support before each deploy and upgrade before it lapses
 * **The CloudFront→ALB origin hop is unencrypted HTTP** (ACM cannot cover
   `*.elb.amazonaws.com`, so the ALB has no HTTPS listener). Browser→CloudFront
   is always HTTPS.
-* **Long-lived AWS keys** (OIDC recommended later — see the security note).
 * **The app connects as the RDS master user** — accepted MVP limitation; see
   "Configuration and secrets bootstrap".
 * **Single-replica backend.** The backend has no HPA (in-memory queue +

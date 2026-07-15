@@ -99,6 +99,10 @@ module "iam" {
   hosting_bucket_arn         = module.s3.bucket_arn
   cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
   eks_cluster_name           = module.eks.cluster_name
+
+  # GitHub Actions OIDC deploy role. dev owns the account-global OIDC provider.
+  environment       = var.environment
+  github_repository = var.github_repository
 }
 
 module "ecr" {

@@ -113,6 +113,14 @@ module "iam" {
   hosting_bucket_arn         = module.s3.bucket_arn
   cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
   eks_cluster_name           = module.eks.cluster_name
+
+  # GitHub Actions OIDC deploy role. The OIDC provider is account-global (one per
+  # account); if prod shares the dev account, dev already created it, so reference
+  # the existing one here rather than creating a duplicate. If prod is a SEPARATE
+  # AWS account, set create_github_oidc_provider = true instead.
+  environment                 = var.environment
+  github_repository           = var.github_repository
+  create_github_oidc_provider = false
 }
 
 module "ecr" {

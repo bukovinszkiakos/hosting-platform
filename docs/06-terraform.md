@@ -205,12 +205,12 @@ including recovery and intentional teardown.
   cost)
 
 The API endpoint has both private and public access enabled. The cluster's
-authentication mode is set explicitly to `API_AND_CONFIG_MAP`: the CI deploy
-principal is granted cluster access via an **EKS access entry**
-(`16-deployment.md` bootstrap step 6), which access entries require — clusters
-created through the API/Terraform would otherwise default to `CONFIG_MAP`,
-where `create-access-entry` is rejected. The cluster creator retains admin
-access (`bootstrap_cluster_creator_admin_permissions = true`).
+authentication mode is set explicitly to `API_AND_CONFIG_MAP`: the CI deploy role
+(GitHub OIDC) is granted cluster access via an **EKS access entry** created by the
+IAM module (`modules/iam/github-oidc.tf`), which access entries require — clusters
+created through the API/Terraform would otherwise default to `CONFIG_MAP`, where
+access entries are rejected. The cluster creator retains admin access
+(`bootstrap_cluster_creator_admin_permissions = true`).
 `kubernetes_version`
 defaults to an EKS standard-support release (currently `1.34`) to avoid
 extended-support pricing; verify the standard-support range at deploy time.

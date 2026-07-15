@@ -17,3 +17,8 @@ output "alb_controller_role_name" {
   description = "Name of the AWS Load Balancer Controller IAM role."
   value       = aws_iam_role.alb_controller.name
 }
+
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions deploy role. Set this as the AWS_ROLE_ARN GitHub secret for deploy.yml (role-to-assume)."
+  value       = aws_iam_role.github_actions.arn
+}

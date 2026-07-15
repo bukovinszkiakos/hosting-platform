@@ -70,3 +70,14 @@ variable "alb_dns_name" {
   description = "DNS name of the platform ALB, known only after the first deploy creates it (kubectl -n hosting-platform get ingress). Empty (default) skips the platform CloudFront distribution so the environment applies before the ALB exists; set it and re-apply as the post-first-deploy step (docs/16-deployment.md)."
   default     = ""
 }
+
+variable "github_repository" {
+  type        = string
+  description = "GitHub repository (owner/repo) allowed to assume the deploy role via OIDC (deploy.yml)."
+  default     = "bukovinszkiakos/hosting-platform"
+
+  validation {
+    condition     = can(regex("^[^/]+/[^/]+$", var.github_repository))
+    error_message = "github_repository must be in 'owner/repo' form."
+  }
+}

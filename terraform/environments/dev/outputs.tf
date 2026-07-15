@@ -92,3 +92,8 @@ output "aws_region" {
   description = "AWS region of this environment (used by the config/secret bootstrap script)"
   value       = var.aws_region
 }
+
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions deploy role — set as the AWS_ROLE_ARN GitHub secret for deploy.yml (role-to-assume)."
+  value       = module.iam.github_actions_role_arn
+}

@@ -6,6 +6,9 @@ az_count = 2
 
 hosting_bucket_name = "hosting-platform-dev-sites"
 
+# GitHub repository allowed to assume the deploy role via OIDC (deploy.yml).
+github_repository = "bukovinszkiakos/hosting-platform"
+
 # Set after the first deploy, once the Ingress has created the ALB
 # (kubectl -n hosting-platform get ingress hosting-platform), then re-apply to
 # create the platform CloudFront distribution — its *.cloudfront.net domain is

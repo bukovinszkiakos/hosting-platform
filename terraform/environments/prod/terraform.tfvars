@@ -6,6 +6,9 @@ az_count = 3
 
 hosting_bucket_name = "hosting-platform-prod-sites"
 
+# GitHub repository allowed to assume the deploy role via OIDC (deploy.yml).
+github_repository = "bukovinszkiakos/hosting-platform"
+
 # REQUIRED at apply time (no default): trusted administration CIDRs for the
 # public EKS API endpoint, e.g. your office/VPN egress IP. Deliberately not
 # committed with a real value — set it here or via

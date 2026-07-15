@@ -68,7 +68,6 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TF_DIR="${REPO_ROOT}/terraform/environments/${ENVIRONMENT}"
 AUTO_TFVARS="${TF_DIR}/alb_dns_name.auto.tfvars"
 NAMESPACE="hosting-platform"
-DEPLOY_USER="hosting-platform-deploy"
 STATE_BUCKET="hosting-platform-tfstate"
 SSM_PARAM="/hosting-platform/${ENVIRONMENT}/db_password"
 
@@ -277,23 +276,18 @@ fi
 # =========================================================================== #
 # Phase 5 — EKS access entry for the deploy principal   [skipped in --app]
 # =========================================================================== #
+# The deploy workflow authenticates via GitHub OIDC and assumes the
+# hosting-platform-<env>-github-actions role. That role's EKS access entry (with
+# AmazonEKSClusterAdminPolicy) is now managed by Terraform (modules/iam/github-oidc.tf)
+# and created during the apply in Phase 4 — no manual access entry is required.
 if [ "$APP_ONLY" = false ]; then
-  banner "5/9" "EKS access entry for ${DEPLOY_USER}"
-  PRINCIPAL="arn:aws:iam::${ACCOUNT_ID}:user/${DEPLOY_USER}"
+  banner "5/9" "EKS access entry (Terraform-managed via OIDC role)"
+  ROLE_PRINCIPAL="arn:aws:iam::${ACCOUNT_ID}:role/hosting-platform-${ENVIRONMENT}-github-actions"
   if aws eks list-access-entries --cluster-name "$CLUSTER_NAME" --region "$REGION" \
-        --query 'accessEntries' --output text 2>/dev/null | grep -q "$PRINCIPAL"; then
-    ok "access entry already present"
+        --query 'accessEntries' --output text 2>/dev/null | grep -q "$ROLE_PRINCIPAL"; then
+    ok "deploy role access entry present (managed by Terraform)"
   else
-    retry 5 8 aws eks create-access-entry --cluster-name "$CLUSTER_NAME" --region "$REGION" \
-      --principal-arn "$PRINCIPAL" >/dev/null 2>&1 || true
-    aws eks associate-access-policy --cluster-name "$CLUSTER_NAME" --region "$REGION" \
-      --principal-arn "$PRINCIPAL" \
-      --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
-      --access-scope type=cluster >/dev/null 2>&1 || true
-    aws eks list-access-entries --cluster-name "$CLUSTER_NAME" --region "$REGION" \
-      --query 'accessEntries' --output text 2>/dev/null | grep -q "$PRINCIPAL" \
-      || die 5 "could not create the EKS access entry for ${DEPLOY_USER}"
-    ok "access entry created"
+    die 5 "deploy role access entry missing for ${ROLE_PRINCIPAL}; ensure 'terraform apply' (Phase 4) succeeded"
   fi
 else
   banner "5/9" "EKS access entry — skipped (--app)"

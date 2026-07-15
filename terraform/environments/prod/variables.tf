@@ -80,3 +80,14 @@ variable "cluster_endpoint_public_access_cidrs" {
     error_message = "cluster_endpoint_public_access_cidrs must contain at least one CIDR block."
   }
 }
+
+variable "github_repository" {
+  type        = string
+  description = "GitHub repository (owner/repo) allowed to assume the deploy role via OIDC (deploy.yml)."
+  default     = "bukovinszkiakos/hosting-platform"
+
+  validation {
+    condition     = can(regex("^[^/]+/[^/]+$", var.github_repository))
+    error_message = "github_repository must be in 'owner/repo' form."
+  }
+}
