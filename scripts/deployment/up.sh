@@ -98,11 +98,16 @@ retry() {
 
 resolve_region() {
   if [ -n "${AWS_REGION:-}" ]; then echo "$AWS_REGION"; return; fi
-  local r
-  r="$(tf_out aws_region)"
-  [ -n "$r" ] && { echo "$r"; return; }
+  local re='^[a-z]{2}-[a-z]+-[0-9]+$' r
+  # Prefer terraform.tfvars (the authoritative input). Fall back to a state
+  # output only if it is a valid region — on a fresh/empty state
+  # `terraform output -raw` prints a "No outputs found" warning to stdout, which
+  # must never be mistaken for a region. Validate the shape before trusting it.
   r="$(awk -F'"' '/^[[:space:]]*aws_region/ {print $2; exit}' "${TF_DIR}/terraform.tfvars" 2>/dev/null || true)"
-  echo "${r:-eu-central-1}"
+  [[ "$r" =~ $re ]] && { echo "$r"; return; }
+  r="$(tf_out aws_region)"
+  [[ "$r" =~ $re ]] && { echo "$r"; return; }
+  echo "eu-central-1"
 }
 
 # --------------------------------------------------------------------------- #
