@@ -45,11 +45,26 @@ public class KubernetesJobService : IKubernetesJobService
     public async Task<BuildJobState> GetBuildJobStateAsync(
         Guid deploymentId, CancellationToken cancellationToken = default)
     {
-        var job = await Client.BatchV1.ReadNamespacedJobAsync(
-            BuildJobNaming.JobName(deploymentId), BuildJobNaming.Namespace,
-            cancellationToken: cancellationToken);
+        try
+        {
+            var job = await Client.BatchV1.ReadNamespacedJobAsync(
+                BuildJobNaming.JobName(deploymentId), BuildJobNaming.Namespace,
+                cancellationToken: cancellationToken);
 
-        return MapState(job.Status);
+            return MapState(job.Status);
+        }
+        catch (k8s.Autorest.HttpOperationException ex)
+            when (ex.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // The Job no longer exists (e.g. removed by TTL cleanup or another
+            // lifecycle event). A missing Job can never make progress, so treat it
+            // as a terminal Failed state rather than letting the 404 propagate as an
+            // unhandled exception. The worker records this as a failed deployment.
+            _logger.LogWarning(
+                "Build Job for deployment {DeploymentId} was not found; treating as Failed",
+                deploymentId);
+            return BuildJobState.Failed;
+        }
     }
 
     // Maps a Kubernetes V1JobStatus to a BuildJobState. Terminal states are taken
