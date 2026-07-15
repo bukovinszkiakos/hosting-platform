@@ -42,7 +42,10 @@ function AdminView() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Only the admin data path loads; non-admins render "Access denied" and never
+  // fetch, so loading starts true only when a request is actually about to run.
+  // (ProtectedRoute guarantees `user` — and thus `isAdmin` — is known on mount.)
+  const [loading, setLoading] = useState(isAdmin);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
