@@ -84,6 +84,9 @@ function DeploymentDetailsView() {
         api.deployments.logs(id, controller.signal),
       ])
         .then(([deploymentData, logData]) => {
+          if (controller.signal.aborted) {
+            return;
+          }
           setDeployment(deploymentData);
           setLogs(logData);
         })
