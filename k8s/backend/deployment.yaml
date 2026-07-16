@@ -32,6 +32,14 @@ spec:
       containers:
         - name: backend
           image: "PLACEHOLDER" # TODO: set ECR image URI
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 8080
           envFrom:

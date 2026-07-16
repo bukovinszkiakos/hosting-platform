@@ -23,3 +23,4 @@ k8s/base/configmap.yaml
 terraform/environments/*/alb_dns_name.auto.tfvars
  PROJECT_HANDOFF_2026-07-13.md
  PROJECT_HANDOFF_2026-07-14.md
+ PROJECT_HANDOFF_2026-07-15.md

@@ -33,6 +33,14 @@ spec:
         - name: migrate
           image: "PLACEHOLDER" # deploy.yml substitutes the backend image URI
           args: ["migrate"] # appended to the entrypoint: dotnet HostingPlatform.Api.dll migrate
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           envFrom:
             - configMapRef:
                 name: backend-config

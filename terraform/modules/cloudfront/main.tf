@@ -3,16 +3,29 @@
 # docs/06-terraform.md "CloudFront Module"). Users access published sites through
 # the CloudFront domain.
 #
-# The S3 bucket is public-read (see the S3 module), so it is used as a plain S3
-# REST origin without Origin Access Control. Locking the origin to CloudFront via
-# OAC is a future hardening, tracked alongside the S3 module.
+# The S3 bucket is private (see the S3 module); CloudFront reads it via Origin
+# Access Control (OAC), signing each origin request with SigV4. The bucket policy
+# that grants this read is defined HERE, not in the S3 module, because it must
+# reference this distribution's ARN — defining it here keeps the module
+# dependency one-directional (s3 -> cloudfront) and avoids a cycle.
 
 locals {
   origin_id = "s3-${var.bucket_name}"
 
-  # CloudFront Function names allow only [a-zA-Z0-9-_]; bucket names may contain
-  # dots, so normalize them out.
+  # CloudFront Function / OAC names allow only [a-zA-Z0-9-_]; bucket names may
+  # contain dots, so normalize them out.
   index_rewrite_function_name = "${replace(var.bucket_name, ".", "-")}-index-rewrite"
+  oac_name                    = "${replace(var.bucket_name, ".", "-")}-oac"
+}
+
+# Origin Access Control: CloudFront signs (SigV4) every request to the S3 origin
+# as the CloudFront service principal, so the bucket can stay fully private.
+resource "aws_cloudfront_origin_access_control" "this" {
+  name                              = local.oac_name
+  description                       = "OAC for ${var.bucket_name}"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
 }
 
 # Rewrites directory-style requests to the per-site index.html. Sites are served
@@ -40,13 +53,9 @@ resource "aws_cloudfront_distribution" "this" {
   price_class         = var.price_class
 
   origin {
-    origin_id   = local.origin_id
-    domain_name = var.bucket_regional_domain_name
-
-    # Empty origin access identity: the bucket is public, so no OAI is used.
-    s3_origin_config {
-      origin_access_identity = ""
-    }
+    origin_id                = local.origin_id
+    domain_name              = var.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.this.id
   }
 
   default_cache_behavior {
@@ -77,4 +86,28 @@ resource "aws_cloudfront_distribution" "this" {
   tags = {
     Name = "${var.bucket_name}-cdn"
   }
+}
+
+# Bucket policy granting this distribution read access via OAC. Scoped to the
+# CloudFront service principal AND this distribution's ARN (AWS:SourceArn), so no
+# other distribution or account can read the private bucket (confused-deputy
+# protection). Lives here rather than in the S3 module to avoid a dependency cycle.
+resource "aws_s3_bucket_policy" "hosting" {
+  bucket = var.bucket_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowCloudFrontServicePrincipalReadOnly"
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${var.bucket_arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.this.arn
+        }
+      }
+    }]
+  })
 }

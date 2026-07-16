@@ -13,6 +13,11 @@ variable "bucket_regional_domain_name" {
   description = "Regional domain name of the S3 hosting bucket (the CloudFront origin). Pass the s3 module's bucket_regional_domain_name output — a data-source lookup by name would fail at plan time while the bucket does not exist yet."
 }
 
+variable "bucket_arn" {
+  type        = string
+  description = "ARN of the S3 hosting bucket (the s3 module's bucket_arn output). Used by the OAC bucket policy defined in this module to grant CloudFront read access."
+}
+
 variable "price_class" {
   type        = string
   description = "CloudFront price class. PriceClass_100 (US/EU edges) keeps dev costs lowest."

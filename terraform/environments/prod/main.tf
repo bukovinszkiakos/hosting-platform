@@ -101,9 +101,21 @@ module "cloudfront" {
 
   bucket_name                 = module.s3.bucket_name
   bucket_regional_domain_name = module.s3.bucket_regional_domain_name
+  bucket_arn                  = module.s3.bucket_arn
 
   # Serve from all edge locations in production.
   price_class = "PriceClass_All"
+}
+
+# The hosting bucket policy moved from the s3 module to the cloudfront module (it
+# now grants CloudFront OAC read and must reference the distribution ARN). Without
+# this, Terraform would destroy the old policy and create the new one with no
+# ordering guarantee, briefly leaving the bucket with no policy. `moved` turns
+# that into an in-place update of the same resource — no gap, state preserved.
+# (prod has no state yet, so this is a harmless no-op until first apply.)
+moved {
+  from = module.s3.aws_s3_bucket_policy.hosting
+  to   = module.cloudfront.aws_s3_bucket_policy.hosting
 }
 
 module "iam" {

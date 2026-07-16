@@ -278,8 +278,9 @@ not an output (it would be printed in plaintext); it is supplied out-of-band.
 ## Responsibilities
 
 * Create Hosting Bucket
-* Create Bucket Policies
-* Configure Public Access Settings
+* Enforce server-side encryption (AES256)
+* Block all public access (the bucket is private; the CloudFront OAC read policy
+  is defined in the CloudFront module because it needs the distribution ARN)
 
 ## force_destroy
 
@@ -302,7 +303,10 @@ content must never be deleted silently). See `16-deployment.md` "Teardown order"
 ## Responsibilities
 
 * Create CloudFront Distribution
-* Configure S3 Origin
+* Configure the S3 Origin with Origin Access Control (OAC) so CloudFront reads
+  the private bucket via SigV4-signed requests
+* Attach the OAC bucket policy to the hosting bucket (defined here, not in the S3
+  module, so it can reference this distribution's ARN without a dependency cycle)
 * Attach a CloudFront Function that rewrites directory requests to `index.html`
   (sites are served under `/{userId}/{projectId}/`, where `default_root_object`
   does not apply)
@@ -312,6 +316,7 @@ content must never be deleted silently). See `16-deployment.md` "Teardown order"
 * bucket_name
 * bucket_regional_domain_name (from the s3 module — not a data-source lookup, which
   would fail at plan time while the bucket does not exist yet)
+* bucket_arn (from the s3 module — used by the OAC bucket policy)
 
 ## Outputs
 
@@ -509,8 +514,5 @@ Future versions may include:
 * **RDS security group scoped to the EKS security group** instead of the VPC
   CIDR (tighter than the current private-subnet + VPC-CIDR isolation; deferred to
   avoid cross-module coupling for marginal MVP benefit).
-* **CloudFront Origin Access Control (OAC)** to lock the S3 bucket to CloudFront
-  only. Deferred because the hosted content is intentionally public static sites,
-  so OAC's benefit is marginal for the MVP.
 * **Highly available NAT** (one NAT Gateway per AZ) for production resilience;
   the MVP uses a single NAT Gateway for cost.

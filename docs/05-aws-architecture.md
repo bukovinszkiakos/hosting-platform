@@ -175,6 +175,13 @@ Storage of generated static website files.
 
 The MVP uses a shared bucket.
 
+## Access
+
+The bucket is **private** (Block Public Access fully enabled). It is not reachable
+directly; CloudFront reads it through Origin Access Control (OAC), and a bucket
+policy grants read only to that distribution. The backend writes objects via its
+IAM role, not a public policy.
+
 Example:
 
 ```text id="g6c2qn"
@@ -200,7 +207,8 @@ hosting-platform
 * CDN functionality
 * Static website delivery
 
-Users access published websites through CloudFront URLs.
+Users access published websites through CloudFront URLs. CloudFront is the only
+reader of the private S3 bucket, via Origin Access Control (OAC).
 
 Because each site is served under `/{userId}/{projectId}/` (not the distribution
 root), a CloudFront Function rewrites directory requests to the site's
