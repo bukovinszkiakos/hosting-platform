@@ -47,6 +47,12 @@ jobs:
       - name: Build
         run: dotnet build HostingPlatform.sln --no-restore -c Release -warnaserror
 
+      # Runs the xUnit test project (HostingPlatform.Api.Tests) built above. A
+      # failing test fails the job, so tests gate merges. Tests use SQLite
+      # in-memory, so no database/service is required.
+      - name: Test
+        run: dotnet test HostingPlatform.sln --no-build -c Release
+
   frontend:
     name: Frontend (lint + types + build)
     runs-on: ubuntu-latest
