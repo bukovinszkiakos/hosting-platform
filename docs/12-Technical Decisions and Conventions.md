@@ -229,6 +229,14 @@ Roles:
 
 Entity Framework Core 8.
 
+## Transient-fault handling
+
+The Npgsql `DbContext` is configured with `EnableRetryOnFailure()`, so transient
+database errors (brief network blips, failover, connection saturation) are retried
+with exponential backoff instead of failing the request. The app uses no
+user-initiated transactions (only `SaveChanges`), so no `ExecuteAsync` wrapping is
+required.
+
 ---
 
 ## Naming
@@ -260,6 +268,26 @@ Applied migrations should never be modified.
 In deployed environments, migrations are applied by a one-off Kubernetes Job that
 runs the backend image with the `migrate` argument, before the application rolls
 out — never on application startup. See `16-deployment.md` "Database migrations".
+
+---
+
+# Security Headers
+
+A baseline set of HTTP security headers is set **in the applications** (versioned
+with the code and testable locally), not at CloudFront/ALB:
+
+* **Frontend** (`next.config.ts` `headers()`): `Strict-Transport-Security`,
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+  and a conservative **Content-Security-Policy** (production builds only, so
+  `next dev` HMR is unaffected). `poweredByHeader` is disabled.
+* **Backend** (`Program.cs` middleware): `X-Content-Type-Options: nosniff` and
+  `Referrer-Policy` on the JSON API (CSP/`X-Frame-Options` add little to JSON);
+  the Kestrel `Server` header is disabled.
+
+The CSP uses `'unsafe-inline'` because Next.js emits inline hydration scripts and
+styles; this is a deliberate MVP trade-off (documented in `next.config.ts`), with
+per-request nonces noted as the strict upgrade. `X-XSS-Protection` is intentionally
+omitted (legacy, removed from modern browsers).
 
 ---
 

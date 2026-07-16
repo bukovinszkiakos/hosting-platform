@@ -11,6 +11,9 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Don't advertise the server implementation ("Server: Kestrel") on responses.
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+
 builder.Services.Configure<AwsSettings>(builder.Configuration.GetSection("AWS"));
 builder.Services.Configure<AuthenticationSettings>(builder.Configuration.GetSection("Authentication"));
 
@@ -18,7 +21,14 @@ var authSettings = builder.Configuration.GetSection("Authentication").Get<Authen
     ?? new AuthenticationSettings();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        // Retry transient PostgreSQL failures (brief network blips, failover,
+        // connection saturation) with exponential backoff instead of failing the
+        // request immediately. Npgsql's retrying strategy only kicks in for errors
+        // it classifies as transient. The app uses no user-initiated transactions
+        // (only SaveChanges), so the strategy needs no ExecuteAsync wrapping.
+        npgsql => npgsql.EnableRetryOnFailure()));
 
 // Persist the ASP.NET Data Protection key ring to the database (via AppDbContext),
 // so keys survive container restarts and are shared across instances. Without this
@@ -143,6 +153,19 @@ if (args.Contains("migrate"))
 }
 
 await app.SeedRolesAsync();
+
+// Baseline security headers on every API response (defense-in-depth). The API
+// returns JSON, so document-only headers (CSP, X-Frame-Options) live in the
+// frontend (next.config.ts) where the browser renders HTML; here we set the two
+// that are meaningful for a JSON API. First in the pipeline so they apply to all
+// responses, including errors written by GlobalExceptionMiddleware.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next();
+});
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
