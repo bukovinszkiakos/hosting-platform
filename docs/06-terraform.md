@@ -196,7 +196,8 @@ including recovery and intentional teardown.
 ## Responsibilities
 
 * Create EKS Cluster
-* Create Managed Node Group
+* Create Managed Node Group (with a launch template that requires IMDSv2 —
+  `http_tokens = required`, hop limit 1 — on the worker instances)
 * Create Cluster IAM Roles
 * Enable the EKS Pod Identity Agent addon
 * Enable the Metrics Server addon (community add-on; supplies the

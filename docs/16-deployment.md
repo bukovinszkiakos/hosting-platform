@@ -805,10 +805,10 @@ Run once after the first deployment (and after any node group / AMI change):
 
 * **Pods cannot reach the node's instance metadata service (IMDS).** Build Jobs
   execute untrusted repository code; if a pod can reach IMDS it can steal the
-  **node role's** credentials (ECR pull, CNI, worker policies). EKS AL2023 AMIs
-  default to IMDSv2-required with hop limit 1, which blocks pods — but that is
-  an inherited platform default, not something this project's Terraform asserts,
-  so verify it:
+  **node role's** credentials (ECR pull, CNI, worker policies). The EKS module's
+  node launch template asserts IMDSv2-required with hop limit 1 (`metadata_options`),
+  which blocks pods, rather than relying on the inherited AMI default. Verify it
+  still holds after any node group / AMI change:
 
   ```bash
   kubectl -n hosting-platform run imds-check --rm -i --restart=Never \

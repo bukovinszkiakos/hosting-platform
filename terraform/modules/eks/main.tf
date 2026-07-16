@@ -99,6 +99,37 @@ resource "aws_eks_cluster" "this" {
 }
 
 # ---------------------------------------------------------------------------
+# Node launch template (IMDSv2 enforcement)
+# ---------------------------------------------------------------------------
+# aws_eks_node_group has no metadata_options argument, so requiring IMDSv2 on the
+# worker instances must go through a launch template (the AWS-documented method).
+# The template sets ONLY the metadata options: with no image_id, instance_type or
+# user_data, EKS still selects the EKS-optimized AMI and generates the node
+# bootstrap user data as usual, so this stays a minimal, metadata-only override.
+
+resource "aws_launch_template" "node" {
+  name = "${var.name_prefix}-node"
+
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required" # IMDSv2 only — reject token-less IMDSv1 requests
+
+    # Hop limit 1: node-level components (kubelet, VPC CNI, kube-proxy, the Pod
+    # Identity Agent) run in the host network namespace and still reach IMDS, but
+    # pods in their own namespace cannot. Build Jobs run untrusted repository
+    # code, so blocking them from stealing the node role's credentials is the
+    # point (see docs/16-deployment.md "Post-deploy verification"). Pods receive
+    # AWS credentials from EKS Pod Identity, not IMDS, so nothing in-cluster
+    # depends on pod IMDS access.
+    http_put_response_hop_limit = 1
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-node"
+  }
+}
+
+# ---------------------------------------------------------------------------
 # Managed node group
 # ---------------------------------------------------------------------------
 
@@ -108,6 +139,13 @@ resource "aws_eks_node_group" "this" {
   node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = var.private_subnet_ids
   instance_types  = var.node_instance_types
+
+  # Enforce IMDSv2 on the worker instances. The launch template omits the
+  # instance type, so instance_types above still governs sizing.
+  launch_template {
+    id      = aws_launch_template.node.id
+    version = aws_launch_template.node.latest_version
+  }
 
   scaling_config {
     desired_size = var.node_desired_size
