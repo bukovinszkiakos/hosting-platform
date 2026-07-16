@@ -599,9 +599,9 @@ These full URIs (including the tag) are what `deploy.yml` takes as its
 * **No image optimization dependency (`sharp`) is bundled.** The app does not rely
   on server-side `next/image` optimization; if that changes, add `sharp` and
   rebuild.
-* **Data Protection keys are ephemeral in the container** (no key persistence
-  configured), consistent with the documented single-replica MVP behaviour
-  (`07-kubernetes.md` "Backend Replicas"): a restart logs users out.
+* **Data Protection keys are persisted to the database** (`PersistKeysToDbContext`),
+  so authentication cookies survive backend restarts and redeploys and are
+  shareable across replicas (`07-kubernetes.md` "Backend Replicas").
 * The images are **framework-dependent** (not self-contained / trimmed / ReadyToRun)
   to keep the build simple and avoid altering runtime behaviour.
 
@@ -901,10 +901,9 @@ during any deploy or incident:
 Why this trade-off is accepted: a rolling update would briefly run **two**
 backend pods, which violates the single-replica invariant the MVP depends on —
 the new pod's startup recovery would mark deployments `Failed` while the old pod
-is still driving them, and the pods cannot decrypt each other's session cookies
-(ephemeral Data Protection keys). Correctness of the deployment pipeline is
-prioritized over a few seconds of deploy-time availability. The frontend is
-unaffected (stateless, rolling update, HPA-managed).
+is still driving them. Correctness of the deployment pipeline is prioritized over
+a few seconds of deploy-time availability. The frontend is unaffected (stateless,
+rolling update, HPA-managed).
 
 ## Rollback options
 
@@ -1038,8 +1037,9 @@ is still within standard support before each deploy and upgrade before it lapses
   is always HTTPS.
 * **The app connects as the RDS master user** — accepted MVP limitation; see
   "Configuration and secrets bootstrap".
-* **Single-replica backend.** The backend has no HPA (in-memory queue +
-  ephemeral Data Protection keys); see `07-kubernetes.md` "Backend Replicas".
+* **Single-replica backend.** The backend has no HPA (in-memory deployment
+  queue); see `07-kubernetes.md` "Backend Replicas". Data Protection keys are
+  persisted to the database, so they no longer constrain replica count.
 * **Backend deploys briefly interrupt the API** (`strategy: Recreate`), and a
   failed backend rollout leaves no old pod serving — see "Rollback strategy".
 * **Migrations are not auto-reverted.** They are applied automatically before each

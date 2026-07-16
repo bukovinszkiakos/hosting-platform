@@ -1,5 +1,6 @@
 using HostingPlatform.Api.Configuration;
 using HostingPlatform.Api.Data;
+using Microsoft.AspNetCore.DataProtection;
 using HostingPlatform.Api.Entities;
 using HostingPlatform.Api.Extensions;
 using HostingPlatform.Api.Middleware;
@@ -18,6 +19,15 @@ var authSettings = builder.Configuration.GetSection("Authentication").Get<Authen
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Persist the ASP.NET Data Protection key ring to the database (via AppDbContext),
+// so keys survive container restarts and are shared across instances. Without this
+// the default in-memory key ring is regenerated on every start, invalidating all
+// auth cookies on each deploy/restart. SetApplicationName pins the key isolation
+// scope so the ring stays stable regardless of host/container name.
+builder.Services.AddDataProtection()
+    .SetApplicationName("HostingPlatform")
+    .PersistKeysToDbContext<AppDbContext>();
 
 builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
     {

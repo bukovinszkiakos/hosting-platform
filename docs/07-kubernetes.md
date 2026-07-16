@@ -448,17 +448,17 @@ Max Replicas: 3
 # Backend Replicas
 
 The backend runs as a **single replica** with **no HPA** during the MVP. Its
-deployment queue is in-memory and per-pod, and its ASP.NET Core Data Protection
-keys are ephemeral, so multiple replicas would:
-
-* lose deployments queued on a pod that scales down, and
-* be unable to decrypt each other's authentication cookies.
+deployment queue is in-memory and per-pod, so multiple replicas would lose
+deployments queued on a pod that scales down. ASP.NET Core Data Protection keys
+are persisted to the database, so authentication cookies survive restarts and are
+already shareable across replicas — the in-memory queue is the only remaining
+single-replica constraint.
 
 A backend HPA (and multi-replica operation) should be re-enabled only once the
-deployment queue is durable and Data Protection keys are persisted (see
-"MVP Limitations" in `10-deployment-workflow.md`). A single-replica restart still
-logs users out (ephemeral keys) and marks any in-flight deployment `Failed` via
-startup recovery — accepted MVP trade-offs.
+deployment queue is durable (see "MVP Limitations" in
+`10-deployment-workflow.md`). A single-replica restart no longer logs users out
+(keys are persisted), but it still marks any in-flight deployment `Failed` via
+startup recovery — an accepted MVP trade-off.
 
 The single replica also serves as the platform's **effective deployment
 concurrency limit**: the worker processes one deployment at a time per pod, so
@@ -537,5 +537,6 @@ Future versions may include:
   and build containers legitimately need to write and install packages at runtime.
 * **Dedicated build service account + per-project IAM session policies** (see
   "Service Account and AWS Access").
-* **Durable deployment queue + persisted Data Protection keys**, which together
-  allow re-enabling a backend HPA / multi-replica backend.
+* **Durable deployment queue**, which would allow re-enabling a backend HPA /
+  multi-replica backend. (Data Protection keys are already persisted to the
+  database, so cookie sharing across replicas is no longer a blocker.)

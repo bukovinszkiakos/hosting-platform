@@ -264,8 +264,7 @@ hpa/
 ```
 
 > Only the frontend has an HPA. The backend runs as a single replica during the
-> MVP (in-memory queue + ephemeral Data Protection keys); see
-> `07-kubernetes.md` "Backend Replicas".
+> MVP (in-memory deployment queue); see `07-kubernetes.md` "Backend Replicas".
 
 ---
 

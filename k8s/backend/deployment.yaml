@@ -6,16 +6,18 @@ metadata:
   labels:
     app: backend
 spec:
-  # Single replica for the MVP: the deployment queue is in-memory and per-pod and
-  # ASP.NET Data Protection keys are ephemeral, so multiple replicas would lose
-  # queued deployments and fail to share auth cookies. There is intentionally no
-  # backend HPA (see docs/07-kubernetes.md "Horizontal Pod Autoscaler").
+  # Single replica for the MVP: the deployment queue is in-memory and per-pod, so
+  # multiple replicas would lose queued deployments — this is now the only reason
+  # the backend is single-replica. (ASP.NET Data Protection keys are persisted to
+  # the database, so auth cookies already survive restarts and are shareable across
+  # replicas.) There is intentionally no backend HPA (see docs/07-kubernetes.md
+  # "Horizontal Pod Autoscaler").
   replicas: 1
   # Recreate, not RollingUpdate: the default rolling update briefly runs TWO
   # backend pods (maxSurge 1), violating the single-replica invariant above —
   # the new pod's startup recovery would mark deployments Failed while the old
-  # pod is still driving them, and the pods cannot share auth cookies. The cost
-  # is a few seconds of API downtime per deploy, which the MVP accepts.
+  # pod is still driving them. The cost is a few seconds of API downtime per
+  # deploy, which the MVP accepts.
   strategy:
     type: Recreate
   selector:

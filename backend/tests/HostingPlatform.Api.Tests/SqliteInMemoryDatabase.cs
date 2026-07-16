@@ -26,6 +26,10 @@ public sealed class SqliteInMemoryDatabase : IDisposable
         context.Database.EnsureCreated();
     }
 
+    // The shared open connection, for tests that need to register their own
+    // AppDbContext over the same in-memory database (e.g. Data Protection).
+    public SqliteConnection Connection => _connection;
+
     public AppDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
