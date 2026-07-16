@@ -214,9 +214,12 @@ former bootstrap step 6, now retired, below).
 # Bootstrap requirements (manual, one-time)
 
 These are performed once per AWS account/environment before the first `deploy.yml`
-run. They are intentionally **not** automated (state safety, external
-dependencies, and image build/publish being a deliberate operator step — no
-automated image publishing pipeline yet).
+run. They are intentionally **not** automated (state safety and external
+dependencies). Application **image build/publish is automated**: on every push to
+`main`, the CI `images` job (`.github/workflows/ci.yml`) builds and pushes
+SHA-tagged backend/frontend images to the **dev** ECR repositories, after all
+validation jobs pass. `up.sh` still builds/pushes locally for bootstrap and
+ad-hoc redeploys; `deploy.yml` consumes an image URI from either path.
 
 1. **Terraform remote state** — run `scripts/terraform/bootstrap-remote-state.sh`
    to create the state bucket (idempotent), then uncomment the `backend "s3"` block

@@ -127,3 +127,67 @@ jobs:
           VERSION="v0.6.7"
           curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${VERSION}/kubeconform-linux-amd64.tar.gz" | tar -xz
           ./kubeconform -strict -summary -ignore-missing-schemas k8s/
+
+  # Build and push the application images to the DEV ECR repositories, tagged by
+  # commit SHA. Runs only on a push to main and only after every validation job
+  # passes, so nothing is published from a PR or a red build. Deployment remains a
+  # separate, manual step (deploy.yml) that consumes these image URIs.
+  images:
+    name: Build & push images (dev ECR)
+    needs: [backend, frontend, terraform, kubernetes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The dev GitHub Environment: makes the OIDC token subject
+    # (repo:<repo>:environment:dev) match the dev role's trust policy and exposes
+    # the env-scoped AWS_ROLE_ARN / AWS_REGION secrets — same pattern as deploy.yml.
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write # request the OIDC token used to assume the AWS role
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Short commit SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      # linux/amd64 matches the t3 (x86_64) worker nodes. The build contexts are the
+      # backend/ and frontend/ directories, as documented in each Dockerfile.
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/hosting-platform-dev-backend:${{ steps.sha.outputs.short }}
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/hosting-platform-dev-frontend:${{ steps.sha.outputs.short }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## Images pushed to dev ECR"
+            echo "- Backend:  \`${{ steps.ecr.outputs.registry }}/hosting-platform-dev-backend:${{ steps.sha.outputs.short }}\`"
+            echo "- Frontend: \`${{ steps.ecr.outputs.registry }}/hosting-platform-dev-frontend:${{ steps.sha.outputs.short }}\`"
+            echo ""
+            echo "Deploy: Actions → Deploy (manual) → environment=dev, using the URIs above."
+          } >> "$GITHUB_STEP_SUMMARY"
