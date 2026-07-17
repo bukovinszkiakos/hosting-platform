@@ -788,6 +788,21 @@ interpolation). Application logs cover the key security and lifecycle events:
 * Unhandled exceptions: logged as Error by `GlobalExceptionMiddleware` before the
   500 response.
 
+### Log output format
+
+Logs are written to stdout using the framework's built-in console formatters
+(no external logging library such as Serilog — see the dependency-minimalism
+principle above). The formatter is selected per environment via configuration
+(`Logging:Console`), so no code change is required:
+
+* Production emits **single-line JSON** (`FormatterName: "json"`) with scopes
+  included and UTC timestamps. Named message-template placeholders become
+  first-class JSON fields, which keeps the logs queryable. Writing structured
+  JSON to stdout is the CloudWatch-ready producer side: once a log collector
+  (Fluent Bit / Container Insights) is added, entries are parsed into structured
+  fields without any in-app CloudWatch sink. See "Build Logs" below.
+* Development uses the human-readable `simple` formatter for local ergonomics.
+
 ```text id="e1ecg7"
 ILogger<T>
 ```

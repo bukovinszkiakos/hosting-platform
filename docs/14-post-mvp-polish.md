@@ -13,9 +13,11 @@ only when it has actually been implemented.
   for destructive actions. Project delete currently uses a lightweight inline
   confirm, which is adequate for the MVP.
 - **Structured HTTP request logging + CloudWatch integration.** Application event
-  logging via `ILogger<T>` was added in Task 64; per-request access logging and a
-  CloudWatch sink remain deferred (docs/12 "Logging Conventions" already notes
-  CloudWatch as a later addition).
+  logging via `ILogger<T>` was added in Task 64, and structured JSON console
+  output (production) via the built-in formatter followed (docs/12 "Logging
+  Conventions" → "Log output format"). Per-request access logging and a CloudWatch
+  log collector remain deferred (docs/12 already notes CloudWatch as a later
+  addition).
 - **GitHub Actions CI/CD workflow.** Implement only after all core functionality
   is complete (build/test/lint backend + frontend, `terraform fmt`/`validate`,
   image build/push to ECR, deploy).
