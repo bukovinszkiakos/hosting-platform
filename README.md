@@ -168,3 +168,7 @@ distribution's default `*.cloudfront.net` domain (no custom domain required).
 See [`docs/16-deployment.md`](docs/16-deployment.md) for the full process — the
 `up.sh` phases, the SSM write-once password design, `alb_dns_name.auto.tfvars`,
 required GitHub Secrets, deployment order, rollback, and limitations.
+
+## License
+
+Licensed under the MIT License. See [`LICENSE`](LICENSE) for details.
