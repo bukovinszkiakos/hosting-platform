@@ -31,6 +31,10 @@ only when it has actually been implemented.
 
 ## Done
 
+- **Frontend unit tests.** A small, focused Vitest + React Testing Library suite
+  covering the `api` fetch wrapper, pure helpers, and `StatusBadge`, wired into CI
+  as a merge gate (see docs/12 "Frontend Testing"). Page-level and end-to-end tests
+  remain out of scope for the MVP.
 - **Add Logout functionality.** (Task 65) Log out is available from the desktop
   sidebar footer and the mobile menu; it clears the session and returns to `/login`.
 - **Review landing page / session redirect UX.** (Task 65) An authenticated visitor

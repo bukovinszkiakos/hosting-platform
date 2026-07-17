@@ -81,6 +81,12 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      # Runs the Vitest suite (jsdom). A failing test fails the job, so frontend
+      # tests gate merges just like the backend xUnit tests. `test` maps to
+      # `vitest run` (non-watch).
+      - name: Test (Vitest)
+        run: npm test
+
       - name: Build
         run: npm run build
 

@@ -549,6 +549,28 @@ Protected pages should verify authentication before rendering.
 
 ---
 
+# Frontend Testing
+
+Unit tests run on **Vitest** (jsdom environment) with **React Testing Library**
+and `@testing-library/jest-dom`. JSX is transformed by Vitest's built-in esbuild
+(automatic runtime), so no `@vitejs/plugin-react`/Babel toolchain is pulled in —
+keeping the dev-dependency footprint small. Tests are colocated with the code as
+`*.test.ts[x]`, run with `npm test` (`vitest run`), and gate merges in CI
+alongside lint, type-check and build.
+
+The suite is intentionally small and focused on meaningful logic rather than
+coverage: the `api` fetch wrapper (credentials, JSON/204 handling, `ApiError`
+mapping, the central 401 handler), pure helpers (`initials`,
+`navItemsForRole`), and the shared `StatusBadge` (status text, colour variant,
+in-progress pulse).
+
+Deliberately **not** tested for the MVP: page components and routing shells
+(end-to-end territory — see docs/13 Task 62), the `AuthProvider`/`useAuth`
+context (effect/async heavy, brittle), and thin shadcn/ui primitives. No
+coverage tooling or thresholds are configured.
+
+---
+
 # UI Conventions
 
 ## Styling
