@@ -98,8 +98,10 @@ function ProfileView() {
                 accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
               />
             </div>
+            {/* Not keyed on profile.* — keying here would remount the form on a
+                successful save, wiping the "Profile updated." confirmation. The
+                form already holds the saved values in its own state. */}
             <EditProfileForm
-              key={`${profile.displayName}|${profile.email}`}
               initialDisplayName={profile.displayName}
               initialEmail={profile.email}
               onUpdated={handleUpdated}

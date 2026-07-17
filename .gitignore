@@ -1,11 +1,5 @@
-PROJECT_HANDOFF_2026-06-25.md
-PROJECT_HANDOFF_2026-06-26.md
-PROJECT_HANDOFF_2026-06-27.md
-PROJECT_HANDOFF_2026-06-28.md
-PROJECT_HANDOFF_2026-06-29.md
-PROJECT_HANDOFF_2026-06-30.md
- PROJECT_HANDOFF_2026-07-01.md
- PROJECT_HANDOFF_2026-07-02.md
+# Internal project handoff / session notes — never published.
+PROJECT_HANDOFF_*.md
 
 # Real (filled-in) Kubernetes config/secret manifests must never be committed.
 # Use the bootstrap script (scripts/deployment/bootstrap-config.sh) or, if copying
@@ -14,14 +8,14 @@ PROJECT_HANDOFF_2026-06-30.md
 k8s/secrets/*.yaml
 !k8s/secrets/*.example.yaml
 k8s/base/configmap.yaml
- PROJECT_HANDOFF_2026-07-09
- PROJECT_HANDOFF_2026-07-10
 
 # Machine-managed by scripts/deployment/up.sh: holds the discovered ALB hostname
 # for the two-phase platform-CloudFront apply. Terraform auto-loads *.auto.tfvars.
 # Never committed — the human-edited terraform.tfvars stays the readable source.
 terraform/environments/*/alb_dns_name.auto.tfvars
- PROJECT_HANDOFF_2026-07-13.md
- PROJECT_HANDOFF_2026-07-14.md
- PROJECT_HANDOFF_2026-07-15.md
- PROJECT_HANDOFF_2026-07-16.md
+
+# Local Claude Code settings — machine-specific, not shared.
+.claude/settings.local.json
+
+# OS / editor cruft.
+.DS_Store

@@ -18,19 +18,24 @@ only when it has actually been implemented.
   Conventions" → "Log output format"). Per-request access logging and a CloudWatch
   log collector remain deferred (docs/12 already notes CloudWatch as a later
   addition).
-- **GitHub Actions CI/CD workflow.** Implement only after all core functionality
-  is complete (build/test/lint backend + frontend, `terraform fmt`/`validate`,
-  image build/push to ECR, deploy).
 - **Deploy / Edit actions on the Projects list cards.** Today the list card links
   to the project and exposes Delete; Deploy and Edit live on the project detail
   page. doc 09 lists all three under the Projects page. Functional (Deploy/Edit
   are reachable via the detail page) — purely a convenience improvement.
-- **Live deployment status refresh.** The deployment detail and project detail
-  pages load once; a deployment in `Building` does not auto-update without a
-  manual refresh. Consider lightweight polling while a deployment is non-terminal.
+- **Live status refresh on list views.** The deployment *detail* page now
+  auto-refreshes while a deployment is in progress (see Done). The project detail
+  and home pages still load once; a status change there needs a manual refresh.
+  Consider lightweight polling on those views too.
 
 ## Done
 
+- **GitHub Actions CI/CD workflow.** Implemented as `ci.yml` (build/test/lint
+  backend + frontend, `terraform fmt`/`validate`, `kubeconform`, and image
+  build/push to the dev ECR on `main`) plus a separate manual `deploy.yml` that
+  applies the Kubernetes manifests to EKS. See docs/11 "CI Pipeline".
+- **Live deployment status refresh (deployment detail).** The deployment detail
+  page polls while the deployment is non-terminal and stops at `Online`/`Failed`.
+  The project and home list views still load once (see Open items).
 - **Frontend unit tests.** A small, focused Vitest + React Testing Library suite
   covering the `api` fetch wrapper, pure helpers, and `StatusBadge`, wired into CI
   as a merge gate (see docs/12 "Frontend Testing"). Page-level and end-to-end tests

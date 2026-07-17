@@ -73,7 +73,7 @@ PGPASSWORD=localdev psql -h localhost -p 5432 -U hostingplatform -d hostingplatf
  WHERE u.\"Email\"='YOUR_EMAIL' AND r.\"Name\"='Admin' ON CONFLICT DO NOTHING;"
 ```
 
-Sign out (clear the `HostingPlatform.Auth` cookie) and sign back in, then open `/admin`.
+Sign out (via the Log out button in the sidebar/menu) and sign back in, then open `/admin`.
 
 > **In AWS** the local `psql` command above does not work — RDS is private. Use
 > the temporary in-cluster psql pod procedure instead: see `16-deployment.md`
@@ -83,9 +83,8 @@ Sign out (clear the `HostingPlatform.Auth` cookie) and sign back in, then open `
 
 These are tracked in [`14-post-mvp-polish.md`](14-post-mvp-polish.md):
 
-- **No Logout button** in the UI yet — to re-test auth, clear the
-  `HostingPlatform.Auth` cookie in DevTools.
-- A deployment in `Building` does not auto-refresh; reload to see the final status.
+- The deployment detail page auto-refreshes while a build is in progress; the
+  project and home list views reflect status changes on reload.
 
 ## 5. Reset / stop
 

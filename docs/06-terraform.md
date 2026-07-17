@@ -371,9 +371,10 @@ Behaviour is tunable through variables with production-safe defaults:
 * **Pulls.** The EKS node role already has `AmazonEC2ContainerRegistryReadOnly`
   (EKS module), so no additional IAM is required for the cluster to pull images.
 
-The GitHub Actions deploy workflow assumes these repositories already exist and
-only builds/tags/pushes images to them (image build/push is not yet automated —
-see `16-deployment.md`).
+These repositories must already exist before images are pushed. The CI workflow
+(`ci.yml`) builds and pushes images to the **dev** repositories (tagged by commit
+SHA) on pushes to `main`; the separate manual deploy workflow (`deploy.yml`)
+consumes those image URIs to roll out to EKS. See `16-deployment.md`.
 
 ---
 

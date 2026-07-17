@@ -299,7 +299,7 @@ scripts/
 
 `ci.yml` runs on every push and pull request. It only builds/validates the
 project (Continuous Integration); deployment to AWS is intentionally a separate,
-manually triggered workflow (not yet implemented). The workflow runs four
+manually triggered workflow (`deploy.yml`). The workflow runs four
 independent jobs in parallel:
 
 ```text id="m4qfki"
