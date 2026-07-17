@@ -552,8 +552,8 @@ Protected pages should verify authentication before rendering.
 # Frontend Testing
 
 Unit tests run on **Vitest** (jsdom environment) with **React Testing Library**
-and `@testing-library/jest-dom`. JSX is transformed by Vitest's built-in esbuild
-(automatic runtime), so no `@vitejs/plugin-react`/Babel toolchain is pulled in —
+and `@testing-library/jest-dom`. JSX is transformed by Vitest's built-in oxc
+transformer (automatic runtime), so no `@vitejs/plugin-react`/Babel toolchain is pulled in —
 keeping the dev-dependency footprint small. Tests are colocated with the code as
 `*.test.ts[x]`, run with `npm test` (`vitest run`), and gate merges in CI
 alongside lint, type-check and build.
